@@ -1,22 +1,54 @@
-# virtual-better-align
+# Alignment Sanity
 
-Align equal signs and colons on adjacent lines, but not by inserting spaces but by just visually shifting text around.
+A VS Code/Cursor extension that visually aligns `=`, `:`, `&&`, and `||` operators **without modifying your files**.
 
-<p align="center">
-  <img src="https://github.com/hborchardt/virtual-better-align/blob/main/images/tutorial.gif" alt="Tutorial" width="620px">
-</p>
+![Tutorial](https://github.com/hborchardt/virtual-better-align/blob/main/images/tutorial.gif?raw=true)
 
 ## Why?
-Aligning assignments vertically makes it easier to recognize the structure of the code. But actually inserting space characters has disadvantates, because it can mean changes to unrelated lines in your `git diff` just to keep the alignment correct. And incorrect alignment is worse than no alignment.
 
-The solution is to introduce the necessary spaces only virtually, in the editor, but not in the file on disk.
+Vertical alignment makes code easier to scan. But inserting actual spaces pollutes your git diffs with whitespace changes on unrelated lines.
 
+This extension shifts text visually in the editor only—the file on disk stays untouched.
 
+## What's different from the original?
 
-## Commands
-- "Virtual Better Align: Toggle active" activates or deactivates the extension functionality
+This is based on [hborchardt/virtual-better-align](https://github.com/hborchardt/virtual-better-align) with these changes:
 
-## Contributing
-Feel free to create issues and pull requests.
+- **TypeScript/TSX only** — won't activate for other file types
+- **Ignores comments** — lines starting with `//`, `/*`, `*` are skipped
+- **Aligns `&&` and `||`** — useful for conditional class arrays:
 
-[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/yellow_img.png)](https://www.buymeacoffee.com/hborchardt)
+```typescript
+const classes = [
+  isUnrecognized               && "header--unrecognized",
+  hasErrors && !isUnrecognized && "header--error",
+  isEditing                    && "header--editing",
+  isSelected                   && "header--selected",
+]
+```
+
+## Installation
+
+```bash
+curl -LO https://raw.githubusercontent.com/zaydek/alignment-sanity/main/alignment-sanity-1.0.0.vsix
+cursor --install-extension alignment-sanity-1.0.0.vsix
+```
+
+Or for VS Code:
+```bash
+code --install-extension alignment-sanity-1.0.0.vsix
+```
+
+## Usage
+
+The extension activates automatically for `.ts` and `.tsx` files.
+
+Toggle it off/on via Command Palette: **"Alignment Sanity: Toggle active"**
+
+## Credits
+
+Original extension by [@hborchardt](https://github.com/hborchardt) — [virtual-better-align](https://github.com/hborchardt/virtual-better-align)
+
+## License
+
+MIT
