@@ -76,14 +76,19 @@ export function groupTokens(tokens: AlignmentToken[]): AlignmentGroup[] {
 
 /**
  * Creates an alignment group from a list of tokens.
- * Calculates the target column as where values should start:
- * the rightmost operator end position + 1 (for minimum 1 space after operator).
+ * Calculates the target column as where operators should START:
+ * the rightmost operator column position (so all operators align).
+ * 
+ * Example:
+ *   passes   = sum(...)  <- operator at column 9
+ *   warnings = sum(...)  <- operator at column 9
+ *   fails    = sum(...)  <- operator at column 9
  */
 function createGroup(tokens: AlignmentToken[]): AlignmentGroup {
-  // Find the rightmost position where an operator ends
-  const maxEndColumn = Math.max(...tokens.map((t) => t.column + t.text.length));
-  // Values should start 1 space after the rightmost operator
-  const targetColumn = maxEndColumn + 1;
+  // Find the rightmost column where an operator starts
+  const maxColumn = Math.max(...tokens.map((t) => t.column));
+  // All operators should align at this column
+  const targetColumn = maxColumn;
 
   return {
     id: `${tokens[0].line}-${tokens[0].column}-${tokens[0].type}`,
