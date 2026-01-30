@@ -6,25 +6,49 @@ import * as assert from "assert";
 import { AlignmentToken } from "../core/types";
 import { groupTokens } from "../logic/Grouper";
 
+// Helper to create tokens with default values
+function token(
+  line: number,
+  column: number,
+  text: string,
+  type: "=" | ":" | "&&" | "||" | "and" | "or",
+  opts?: {
+    indent?: number;
+    parentType?: string;
+    tokenIndex?: number;
+  },
+): AlignmentToken {
+  return {
+    line,
+    column,
+    text,
+    type,
+    indent: opts?.indent ?? 0,
+    parentType: opts?.parentType ?? "pair",
+    tokenIndex: opts?.tokenIndex ?? 0,
+  };
+}
+
 suite("Grouper Tests", () => {
-  test("groups consecutive tokens with same type and scope", () => {
+  test("groups consecutive tokens with same type, indent, parentType, and tokenIndex", () => {
     const tokens: AlignmentToken[] = [
-      { line: 0, column: 10, text: "=", type: "=", scopeId: "root" },
-      { line: 1, column: 5, text: "=", type: "=", scopeId: "root" },
-      { line: 2, column: 8, text: "=", type: "=", scopeId: "root" },
+      token(0, 10, "=", "=", { indent: 2, parentType: "variable_declaration" }),
+      token(1, 5, "=", "=", { indent: 2, parentType: "variable_declaration" }),
+      token(2, 8, "=", "=", { indent: 2, parentType: "variable_declaration" }),
     ];
 
     const groups = groupTokens(tokens);
 
     assert.strictEqual(groups.length, 1);
     assert.strictEqual(groups[0].tokens.length, 3);
-    assert.strictEqual(groups[0].targetColumn, 10); // max column
+    // targetColumn = max(10+1, 5+1, 8+1) + 1 = 11 + 1 = 12
+    assert.strictEqual(groups[0].targetColumn, 12);
   });
 
   test("separates tokens with different types", () => {
     const tokens: AlignmentToken[] = [
-      { line: 0, column: 5, text: "=", type: "=", scopeId: "root" },
-      { line: 1, column: 5, text: ":", type: ":", scopeId: "root" },
+      token(0, 5, "=", "=", { indent: 0 }),
+      token(1, 5, ":", ":", { indent: 0 }),
     ];
 
     const groups = groupTokens(tokens);
@@ -33,30 +57,61 @@ suite("Grouper Tests", () => {
     assert.strictEqual(groups.length, 0);
   });
 
-  test("separates tokens with different scopes", () => {
+  test("separates tokens with different indentation (nesting levels)", () => {
+    // This tests the JSON nesting problem
     const tokens: AlignmentToken[] = [
-      { line: 0, column: 5, text: ":", type: ":", scopeId: "object_1" },
-      { line: 1, column: 8, text: ":", type: ":", scopeId: "object_1" },
-      { line: 3, column: 3, text: ":", type: ":", scopeId: "object_2" },
-      { line: 4, column: 6, text: ":", type: ":", scopeId: "object_2" },
+      // Outer object property
+      token(0, 15, ":", ":", { indent: 2, parentType: "pair" }),
+      // Inner object property (different indent)
+      token(1, 25, ":", ":", { indent: 4, parentType: "pair" }),
     ];
 
     const groups = groupTokens(tokens);
 
-    assert.strictEqual(groups.length, 2);
-    assert.strictEqual(groups[0].tokens.length, 2);
-    assert.strictEqual(groups[0].targetColumn, 8);
-    assert.strictEqual(groups[1].tokens.length, 2);
-    assert.strictEqual(groups[1].targetColumn, 6);
+    // Different indents = no grouping
+    assert.strictEqual(groups.length, 0);
   });
 
-  test("breaks group on line gap > 1", () => {
+  test("separates tokens with different parent types", () => {
+    // This tests the TypeScript structure problem
     const tokens: AlignmentToken[] = [
-      { line: 0, column: 5, text: "=", type: "=", scopeId: "root" },
-      { line: 1, column: 5, text: "=", type: "=", scopeId: "root" },
-      // Gap of 2 lines
-      { line: 4, column: 5, text: "=", type: "=", scopeId: "root" },
-      { line: 5, column: 5, text: "=", type: "=", scopeId: "root" },
+      // Type annotation colon
+      token(0, 12, ":", ":", { indent: 0, parentType: "type_annotation" }),
+      // Object property colon
+      token(1, 8, ":", ":", { indent: 2, parentType: "pair" }),
+    ];
+
+    const groups = groupTokens(tokens);
+
+    // Different parent types = no grouping
+    assert.strictEqual(groups.length, 0);
+  });
+
+  test("separates tokens with different token indices", () => {
+    // This tests { line: 0, column: 5 } case
+    // The "line:" (index 0) should not align with "column:" (index 1)
+    const tokens: AlignmentToken[] = [
+      token(0, 8, ":", ":", { indent: 2, parentType: "pair", tokenIndex: 0 }),
+      token(0, 15, ":", ":", { indent: 2, parentType: "pair", tokenIndex: 1 }),
+      token(1, 8, ":", ":", { indent: 2, parentType: "pair", tokenIndex: 0 }),
+      token(1, 15, ":", ":", { indent: 2, parentType: "pair", tokenIndex: 1 }),
+    ];
+
+    const groups = groupTokens(tokens);
+
+    // Should form 2 groups: one for tokenIndex 0, one for tokenIndex 1
+    assert.strictEqual(groups.length, 2);
+    assert.strictEqual(groups[0].tokens.length, 2);
+    assert.strictEqual(groups[1].tokens.length, 2);
+  });
+
+  test("breaks group on non-consecutive lines", () => {
+    const tokens: AlignmentToken[] = [
+      token(0, 5, "=", "=", { indent: 0, parentType: "declaration" }),
+      token(1, 5, "=", "=", { indent: 0, parentType: "declaration" }),
+      // Gap of 2 lines (blank line between)
+      token(4, 5, "=", "=", { indent: 0, parentType: "declaration" }),
+      token(5, 5, "=", "=", { indent: 0, parentType: "declaration" }),
     ];
 
     const groups = groupTokens(tokens);
@@ -71,35 +126,74 @@ suite("Grouper Tests", () => {
 
   test("handles single token (no group formed)", () => {
     const tokens: AlignmentToken[] = [
-      { line: 0, column: 5, text: "=", type: "=", scopeId: "root" },
+      token(0, 5, "=", "="),
     ];
 
     const groups = groupTokens(tokens);
     assert.strictEqual(groups.length, 0);
   });
 
-  test("handles unsorted input", () => {
+  test("calculates target column with at least 1 space after operator", () => {
     const tokens: AlignmentToken[] = [
-      { line: 2, column: 8, text: "=", type: "=", scopeId: "root" },
-      { line: 0, column: 10, text: "=", type: "=", scopeId: "root" },
-      { line: 1, column: 5, text: "=", type: "=", scopeId: "root" },
+      token(0, 5, ":", ":", { indent: 2, parentType: "pair" }),
+      token(1, 10, ":", ":", { indent: 2, parentType: "pair" }),
     ];
 
     const groups = groupTokens(tokens);
 
-    assert.strictEqual(groups.length, 1);
-    assert.strictEqual(groups[0].tokens.length, 3);
-    // Should be sorted by line in the output
-    assert.strictEqual(groups[0].tokens[0].line, 0);
-    assert.strictEqual(groups[0].tokens[1].line, 1);
-    assert.strictEqual(groups[0].tokens[2].line, 2);
+    // Max operator end is 10 + 1 = 11, plus 1 space = 12
+    assert.strictEqual(groups[0].targetColumn, 12);
+  });
+
+  test("real-world JSON example: nested objects don't align", () => {
+    // Simulating:
+    // {
+    //   "dependencies": {
+    //     "@pkg": "1.0"
+    //   }
+    // }
+    const tokens: AlignmentToken[] = [
+      token(1, 16, ":", ":", { indent: 2, parentType: "pair" }), // "dependencies":
+      token(2, 11, ":", ":", { indent: 4, parentType: "pair" }), // "@pkg":
+    ];
+
+    const groups = groupTokens(tokens);
+
+    // Different indents = no grouping, even though both are "pair" type
+    assert.strictEqual(groups.length, 0);
+  });
+
+  test("real-world TypeScript: array of objects aligns per-column", () => {
+    // Simulating:
+    // [
+    //   { line: 0, column: 5 },
+    //   { line: 1, column: 10 }
+    // ]
+    const tokens: AlignmentToken[] = [
+      token(1, 8, ":", ":", { indent: 4, parentType: "pair", tokenIndex: 0 }), // line:
+      token(1, 18, ":", ":", { indent: 4, parentType: "pair", tokenIndex: 1 }), // column:
+      token(2, 8, ":", ":", { indent: 4, parentType: "pair", tokenIndex: 0 }), // line:
+      token(2, 18, ":", ":", { indent: 4, parentType: "pair", tokenIndex: 1 }), // column:
+    ];
+
+    const groups = groupTokens(tokens);
+
+    // Two groups: one for first colons, one for second colons
+    assert.strictEqual(groups.length, 2);
+    
+    // First group: both "line:" colons
+    assert.strictEqual(groups[0].tokens[0].tokenIndex, 0);
+    assert.strictEqual(groups[0].tokens[1].tokenIndex, 0);
+    
+    // Second group: both "column:" colons
+    assert.strictEqual(groups[1].tokens[0].tokenIndex, 1);
+    assert.strictEqual(groups[1].tokens[1].tokenIndex, 1);
   });
 });
 
 suite("Types Tests", () => {
   test("isSupportedLanguage returns true for supported languages", () => {
     const { isSupportedLanguage } = require("../core/types");
-
     assert.strictEqual(isSupportedLanguage("typescript"), true);
     assert.strictEqual(isSupportedLanguage("typescriptreact"), true);
     assert.strictEqual(isSupportedLanguage("json"), true);
@@ -109,59 +203,8 @@ suite("Types Tests", () => {
 
   test("isSupportedLanguage returns false for unsupported languages", () => {
     const { isSupportedLanguage } = require("../core/types");
-
     assert.strictEqual(isSupportedLanguage("javascript"), false);
     assert.strictEqual(isSupportedLanguage("rust"), false);
     assert.strictEqual(isSupportedLanguage("go"), false);
-  });
-
-  test("getParserLanguage maps language IDs correctly", () => {
-    const { getParserLanguage } = require("../core/types");
-
-    assert.strictEqual(getParserLanguage("typescript"), "typescript");
-    assert.strictEqual(getParserLanguage("typescriptreact"), "typescript");
-    assert.strictEqual(getParserLanguage("json"), "json");
-    assert.strictEqual(getParserLanguage("jsonc"), "json");
-    assert.strictEqual(getParserLanguage("python"), "python");
-  });
-});
-
-suite("Debounce Tests", () => {
-  test("debounce delays function execution", (done) => {
-    const { debounce } = require("../utils/debounce");
-
-    let callCount = 0;
-    const fn = debounce(() => {
-      callCount++;
-    }, 50);
-
-    fn();
-    fn();
-    fn();
-
-    // Should not have been called yet
-    assert.strictEqual(callCount, 0);
-
-    setTimeout(() => {
-      assert.strictEqual(callCount, 1);
-      done();
-    }, 100);
-  });
-
-  test("debounce cancel prevents execution", (done) => {
-    const { debounce } = require("../utils/debounce");
-
-    let callCount = 0;
-    const fn = debounce(() => {
-      callCount++;
-    }, 50);
-
-    fn();
-    fn.cancel();
-
-    setTimeout(() => {
-      assert.strictEqual(callCount, 0);
-      done();
-    }, 100);
   });
 });

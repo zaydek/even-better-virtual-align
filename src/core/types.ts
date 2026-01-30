@@ -16,8 +16,12 @@ export interface AlignmentToken {
   text: string;
   /** Normalized operator type for grouping */
   type: OperatorType;
-  /** Parent scope identifier for context-aware grouping */
-  scopeId: string;
+  /** Indentation level of this line (leading whitespace count) */
+  indent: number;
+  /** AST parent node type (e.g., "pair", "property_signature") */
+  parentType: string;
+  /** Index of this operator on its line (0 = first, 1 = second, etc.) */
+  tokenIndex: number;
 }
 
 /** A group of tokens that should be aligned together */

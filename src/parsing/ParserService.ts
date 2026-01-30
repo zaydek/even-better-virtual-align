@@ -297,6 +297,9 @@ export class ParserService {
 
       const captures = query.captures(tree.rootNode);
       const tokens: AlignmentToken[] = [];
+      
+      // Track token index per line (for multi-operator lines like { x: 1, y: 2 })
+      const tokenCountByLine: Map<number, number> = new Map();
 
       for (const capture of captures) {
         const node = capture.node;
@@ -319,12 +322,25 @@ export class ParserService {
           continue;
         }
 
+        // Get indentation level of this line
+        const lineText = document.lineAt(line).text;
+        const indent = this.getIndentLevel(lineText);
+        
+        // Get parent type for structural grouping
+        const parentType = this.getParentType(node);
+        
+        // Get token index on this line
+        const tokenIndex = tokenCountByLine.get(line) ?? 0;
+        tokenCountByLine.set(line, tokenIndex + 1);
+
         tokens.push({
           line,
           column: node.startPosition.column,
           text: operatorText,
           type: operatorType,
-          scopeId: this.getScopeId(node),
+          indent,
+          parentType,
+          tokenIndex,
         });
       }
 
@@ -347,22 +363,24 @@ export class ParserService {
   ): AlignmentToken[] {
     const tokens: AlignmentToken[] = [];
 
-    // Track brace depth for scope IDs
-    let scopeStack: number[] = [0];
-    let scopeCounter = 0;
+    // Track brace depth for nesting level
+    let currentDepth = 0;
+    
+    // Track token index per line
+    const tokenCountByLine: Map<number, number> = new Map();
 
     for (let lineNum = 0; lineNum < document.lineCount; lineNum++) {
       const lineText = document.lineAt(lineNum).text;
+      const indent = this.getIndentLevel(lineText);
 
       // Update brace depth for scope tracking
       for (let i = 0; i < lineText.length; i++) {
         const char = lineText[i];
         if (char === "{") {
-          scopeCounter++;
-          scopeStack.push(scopeCounter);
+          currentDepth++;
         } else if (char === "}") {
-          if (scopeStack.length > 1) {
-            scopeStack.pop();
+          if (currentDepth > 0) {
+            currentDepth--;
           }
         }
       }
@@ -381,12 +399,17 @@ export class ParserService {
         // Find the position of the colon
         const colonIndex = lineText.indexOf(":", match.index + 1);
         if (colonIndex !== -1) {
+          const tokenIndex = tokenCountByLine.get(lineNum) ?? 0;
+          tokenCountByLine.set(lineNum, tokenIndex + 1);
+          
           tokens.push({
             line: lineNum,
             column: colonIndex,
             text: ":",
             type: ":",
-            scopeId: `object_${scopeStack[scopeStack.length - 1]}`,
+            indent,
+            parentType: "pair", // JSON key-value pairs are always "pair" type
+            tokenIndex,
           });
         }
       }
@@ -441,6 +464,24 @@ export class ParserService {
       default:
         return null;
     }
+  }
+
+  /**
+   * Gets the indentation level (leading whitespace count) of a line.
+   */
+  private getIndentLevel(lineText: string): number {
+    const match = lineText.match(/^(\s*)/);
+    return match ? match[1].length : 0;
+  }
+
+  /**
+   * Gets the AST parent type for structural grouping.
+   * Tokens with different parent types should not align.
+   */
+  private getParentType(node: TreeNode): string {
+    // The parent of the operator tells us its structural role
+    // e.g., "pair" for JSON objects, "property_signature" for TS interfaces
+    return node.parent?.type ?? "unknown";
   }
 
   /**
