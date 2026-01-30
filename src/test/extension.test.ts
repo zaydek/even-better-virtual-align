@@ -16,6 +16,7 @@ function token(
     indent?: number;
     parentType?: string;
     tokenIndex?: number;
+    scopeId?: string;
   },
 ): AlignmentToken {
   return {
@@ -26,6 +27,7 @@ function token(
     indent: opts?.indent ?? 0,
     parentType: opts?.parentType ?? "pair",
     tokenIndex: opts?.tokenIndex ?? 0,
+    scopeId: opts?.scopeId ?? "default_scope",
   };
 }
 
@@ -774,5 +776,58 @@ suite("Inline Object Alignment Tests", () => {
     );
     assert.ok(firstCommaGroup);
     assert.strictEqual(firstCommaGroup!.targetColumn, 19);
+  });
+
+  test("tokens from different scopes don't align", () => {
+    // This tests the case where two JSX attributes have similar structure:
+    // primaryAction={{ label: "Delete" }}
+    // secondaryAction={{ label: "Cancel" }}
+    //
+    // These should NOT align because they're in different object literals
+    const tokens: AlignmentToken[] = [
+      // primaryAction object - scope "object_1"
+      token(0, 20, ":", ":", {
+        indent: 2,
+        parentType: "pair",
+        tokenIndex: 0,
+        scopeId: "object_1",
+      }),
+      // secondaryAction object - scope "object_2"
+      token(1, 22, ":", ":", {
+        indent: 2,
+        parentType: "pair",
+        tokenIndex: 0,
+        scopeId: "object_2",
+      }),
+    ];
+
+    const groups = groupTokens(tokens);
+
+    // Different scopes = no grouping, even though everything else matches
+    assert.strictEqual(groups.length, 0);
+  });
+
+  test("tokens from same scope DO align", () => {
+    // Two properties in the SAME object should align
+    const tokens: AlignmentToken[] = [
+      token(0, 5, ":", ":", {
+        indent: 2,
+        parentType: "pair",
+        tokenIndex: 0,
+        scopeId: "object_1",
+      }),
+      token(1, 10, ":", ":", {
+        indent: 2,
+        parentType: "pair",
+        tokenIndex: 0,
+        scopeId: "object_1",
+      }),
+    ];
+
+    const groups = groupTokens(tokens);
+
+    // Same scope = grouping works
+    assert.strictEqual(groups.length, 1);
+    assert.strictEqual(groups[0].tokens.length, 2);
   });
 });

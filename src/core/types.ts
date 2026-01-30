@@ -22,6 +22,8 @@ export interface AlignmentToken {
   parentType: string;
   /** Index of this operator on its line (0 = first, 1 = second, etc.) */
   tokenIndex: number;
+  /** Scope identifier - tokens must be in the same scope to align */
+  scopeId: string;
 }
 
 /** A group of tokens that should be aligned together */

@@ -356,6 +356,7 @@ export class ParserService {
         type: OperatorType;
         indent: number;
         parentType: string;
+        scopeId: string;
       }
       const captureData: CaptureData[] = [];
 
@@ -387,6 +388,9 @@ export class ParserService {
         // Get parent type for structural grouping
         const parentType = this.getParentType(node);
 
+        // Get scope ID - tokens in different scopes shouldn't align
+        const scopeId = this.getScopeId(node);
+
         captureData.push({
           line,
           column: node.startPosition.column,
@@ -394,6 +398,7 @@ export class ParserService {
           type: operatorType,
           indent,
           parentType,
+          scopeId,
         });
       }
 
@@ -431,6 +436,7 @@ export class ParserService {
             type: ",",
             indent: colons[0].indent,
             parentType: "inline_object", // Special parent type for inline object commas
+            scopeId: colons[0].scopeId, // Inherit scope from the colons
           });
         }
       }
@@ -493,6 +499,9 @@ export class ParserService {
         const tokenIndex = tokenCountByLine.get(lineNum) ?? 0;
         tokenCountByLine.set(lineNum, tokenIndex + 1);
 
+        // For JSON without AST, use indent as scope (same indent = same level)
+        const scopeId = `json_indent_${indent}`;
+
         tokens.push({
           line: lineNum,
           column: colonIndex,
@@ -501,6 +510,7 @@ export class ParserService {
           indent,
           parentType: "pair",
           tokenIndex,
+          scopeId,
         });
       }
     }
@@ -593,6 +603,9 @@ export class ParserService {
         const tokenIndex = tokenCountByLine.get(lineNum) ?? 0;
         tokenCountByLine.set(lineNum, tokenIndex + 1);
 
+        // For YAML without AST, use indent as scope (same indent = same level)
+        const scopeId = `yaml_indent_${indent}`;
+
         tokens.push({
           line: lineNum,
           column: colonIndex,
@@ -601,6 +614,7 @@ export class ParserService {
           indent,
           parentType: "pair",
           tokenIndex,
+          scopeId,
         });
       }
     }
@@ -739,10 +753,14 @@ export class ParserService {
         continue;
       }
 
+      // Each code block gets a unique scope to prevent cross-block alignment
+      const blockScopeId = `md_block_${block.startLine}`;
+
       const blockTokens = await this.parseCodeBlockContent(
         block.content,
         block.lang,
         block.startLine,
+        blockScopeId,
       );
 
       tokens.push(...blockTokens);
@@ -759,6 +777,7 @@ export class ParserService {
     content: string,
     lang: string,
     lineOffset: number,
+    blockScopeId: string,
   ): Promise<AlignmentToken[]> {
     const tokens: AlignmentToken[] = [];
 
@@ -778,6 +797,9 @@ export class ParserService {
           const tokenIndex = tokenCountByLine.get(docLine) ?? 0;
           tokenCountByLine.set(docLine, tokenIndex + 1);
 
+          // Use block scope + indent for scoping within the block
+          const scopeId = `${blockScopeId}_indent_${indent}`;
+
           tokens.push({
             line: docLine,
             column: colonPos,
@@ -786,6 +808,7 @@ export class ParserService {
             indent,
             parentType: "pair",
             tokenIndex,
+            scopeId,
           });
         }
       }
@@ -815,6 +838,9 @@ export class ParserService {
           const tokenIndex = tokenCountByLine.get(docLine) ?? 0;
           tokenCountByLine.set(docLine, tokenIndex + 1);
 
+          // Use block scope + indent for scoping within the block
+          const scopeId = `${blockScopeId}_indent_${indent}`;
+
           tokens.push({
             line: docLine,
             column: colonPos,
@@ -823,6 +849,7 @@ export class ParserService {
             indent,
             parentType: "pair",
             tokenIndex,
+            scopeId,
           });
         }
       }
@@ -858,6 +885,7 @@ export class ParserService {
           type: OperatorType;
           indent: number;
           parentType: string;
+          scopeId: string;
         }
         const captureData: CaptureData[] = [];
 
@@ -881,6 +909,10 @@ export class ParserService {
           const indent = this.getIndentLevel(lineText);
           const parentType = this.getParentType(node);
 
+          // Combine block scope with AST scope for fine-grained grouping
+          const astScopeId = this.getScopeId(node);
+          const scopeId = `${blockScopeId}_${astScopeId}`;
+
           captureData.push({
             line: docLine,
             column: node.startPosition.column,
@@ -888,6 +920,7 @@ export class ParserService {
             type: operatorType,
             indent,
             parentType,
+            scopeId,
           });
         }
 
@@ -917,6 +950,7 @@ export class ParserService {
               type: ",",
               indent: colons[0].indent,
               parentType: "inline_object",
+              scopeId: colons[0].scopeId, // Inherit scope from colons
             });
           }
         }

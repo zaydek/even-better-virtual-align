@@ -23,11 +23,12 @@ export function groupTokens(tokens: AlignmentToken[]): AlignmentGroup[] {
     return [];
   }
 
-  // Group tokens by their structural key (type, indent, parentType, tokenIndex)
+  // Group tokens by their structural key (type, indent, parentType, tokenIndex, scopeId)
+  // scopeId ensures tokens from different containers (e.g., different objects) don't align
   const buckets = new Map<string, AlignmentToken[]>();
 
   for (const token of tokens) {
-    const key = `${token.type}|${token.indent}|${token.parentType}|${token.tokenIndex}`;
+    const key = `${token.type}|${token.indent}|${token.parentType}|${token.tokenIndex}|${token.scopeId}`;
     if (!buckets.has(key)) {
       buckets.set(key, []);
     }
