@@ -332,10 +332,19 @@ export class ParserService {
       }
 
       const captures = query.captures(tree.rootNode);
-      const tokens: AlignmentToken[] = [];
 
-      // Track token index per line (for multi-operator lines like { x: 1, y: 2 })
-      const tokenCountByLine: Map<number, number> = new Map();
+      // First pass: collect all valid captures with their metadata
+      // We need to sort by column before assigning tokenIndex because
+      // Tree-sitter returns captures in AST order, not left-to-right text order
+      interface CaptureData {
+        line: number;
+        column: number;
+        text: string;
+        type: OperatorType;
+        indent: number;
+        parentType: string;
+      }
+      const captureData: CaptureData[] = [];
 
       for (const capture of captures) {
         const node = capture.node;
@@ -365,17 +374,32 @@ export class ParserService {
         // Get parent type for structural grouping
         const parentType = this.getParentType(node);
 
-        // Get token index on this line
-        const tokenIndex = tokenCountByLine.get(line) ?? 0;
-        tokenCountByLine.set(line, tokenIndex + 1);
-
-        tokens.push({
+        captureData.push({
           line,
           column: node.startPosition.column,
           text: operatorText,
           type: operatorType,
           indent,
           parentType,
+        });
+      }
+
+      // Sort by line, then by column (left-to-right order)
+      captureData.sort((a, b) => {
+        if (a.line !== b.line) return a.line - b.line;
+        return a.column - b.column;
+      });
+
+      // Second pass: assign token indices based on sorted order
+      const tokens: AlignmentToken[] = [];
+      const tokenCountByLine: Map<number, number> = new Map();
+
+      for (const data of captureData) {
+        const tokenIndex = tokenCountByLine.get(data.line) ?? 0;
+        tokenCountByLine.set(data.line, tokenIndex + 1);
+
+        tokens.push({
+          ...data,
           tokenIndex,
         });
       }
