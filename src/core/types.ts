@@ -1,0 +1,62 @@
+/**
+ * Core types for alignment extension.
+ * These interfaces decouple parsing from rendering.
+ */
+
+/** Supported operator types across all languages */
+export type OperatorType = "=" | ":" | "&&" | "||" | "and" | "or";
+
+/** A single alignable operator found in the document */
+export interface AlignmentToken {
+  /** Line number (0-indexed) */
+  line: number;
+  /** Column where the operator starts */
+  column: number;
+  /** The operator text */
+  text: string;
+  /** Normalized operator type for grouping */
+  type: OperatorType;
+  /** Parent scope identifier for context-aware grouping */
+  scopeId: string;
+}
+
+/** A group of tokens that should be aligned together */
+export interface AlignmentGroup {
+  /** Unique identifier for this group */
+  id: string;
+  /** Tokens in this group, sorted by line */
+  tokens: AlignmentToken[];
+  /** Target column to align to (max column in group) */
+  targetColumn: number;
+}
+
+/** Supported language identifiers */
+export type SupportedLanguage =
+  | "typescript"
+  | "typescriptreact"
+  | "json"
+  | "jsonc"
+  | "python";
+
+/** Check if a language ID is supported */
+export function isSupportedLanguage(
+  langId: string,
+): langId is SupportedLanguage {
+  return ["typescript", "typescriptreact", "json", "jsonc", "python"].includes(
+    langId,
+  );
+}
+
+/** Map VS Code language IDs to parser language keys */
+export function getParserLanguage(langId: SupportedLanguage): string {
+  switch (langId) {
+    case "typescript":
+    case "typescriptreact":
+      return "typescript";
+    case "json":
+    case "jsonc":
+      return "json";
+    case "python":
+      return "python";
+  }
+}

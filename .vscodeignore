@@ -1,11 +1,15 @@
 .vscode/**
 .vscode-test/**
 src/**
+scripts/**
+parsers/**
 .gitignore
 .yarnrc
+.llm-council/**
 vsc-extension-quickstart.md
 **/tsconfig.json
 **/.eslintrc.json
 **/*.map
 **/*.ts
 **/.vscode-test.*
+!node_modules/@vscode/tree-sitter-wasm/**

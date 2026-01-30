@@ -1,59 +1,34 @@
 {
   "name": "alignment-sanity",
   "displayName": "Alignment Sanity",
-  "description": "Virtual alignment of = : && || in TypeScript/TSX without modifying files",
-  "version": "1.0.0",
+  "description": "Virtual alignment of = : && || and/or in TypeScript, JSON, and Python without modifying files",
+  "version": "2.0.0",
   "engines": {
     "vscode": "^1.85.0"
   },
   "categories": [
+    "Formatters",
     "Other"
   ],
-  "activationEvents": ["onStartupFinished"],
+  "activationEvents": [
+    "onLanguage:typescript",
+    "onLanguage:typescriptreact",
+    "onLanguage:json",
+    "onLanguage:jsonc",
+    "onLanguage:python"
+  ],
   "main": "./out/extension.js",
   "author": {
-    "name": "hborchardt"
+    "name": "zaydek"
   },
   "publisher": "zaydek",
   "repository": "github:zaydek/alignment-sanity",
   "license": "MIT",
   "contributes": {
-    "commands": [{
-      "command": "virtual-better-align.CursorUp",
-      "title": "Virtual Better Align: Move cursor up"
-    },{
-      "command": "virtual-better-align.CursorDown",
-      "title": "Virtual Better Align: Move cursor down"
-    },{
-      "command": "virtual-better-align.CursorShiftUp",
-      "title": "Virtual Better Align: Move selection cursor up"
-    },{
-      "command": "virtual-better-align.CursorShiftDown",
-      "title": "Virtual Better Align: Move selection cursor down"
-    },{
-      "command": "virtual-better-align.ToggleActive",
-      "title": "Virtual Better Align: Toggle active"
-    }],
-    "keybindings": [
+    "commands": [
       {
-        "command": "virtual-better-align.CursorUp",
-        "key": "up",
-        "when": "editorTextFocus"
-      },
-      {
-        "command": "virtual-better-align.CursorDown",
-        "key": "down",
-        "when": "editorTextFocus"
-      },
-      {
-        "command": "virtual-better-align.CursorShiftUp",
-        "key": "shift+up",
-        "when": "editorTextFocus"
-      },
-      {
-        "command": "virtual-better-align.CursorShiftDown",
-        "key": "shift+down",
-        "when": "editorTextFocus"
+        "command": "alignment-sanity.toggle",
+        "title": "Alignment Sanity: Toggle"
       }
     ]
   },
@@ -63,17 +38,21 @@
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
-    "test": "vscode-test"
+    "test": "vscode-test",
+    "postinstall": "node scripts/patch-tree-sitter.js"
+  },
+  "dependencies": {
+    "@vscode/tree-sitter-wasm": "^0.3.0"
   },
   "devDependencies": {
-    "@types/vscode": "^1.85.0",
     "@types/mocha": "^10.0.6",
-    "@types/node": "18.x",
+    "@types/node": "20.x",
+    "@types/vscode": "^1.85.0",
     "@typescript-eslint/eslint-plugin": "^6.15.0",
     "@typescript-eslint/parser": "^6.15.0",
-    "eslint": "^8.56.0",
-    "typescript": "^5.3.3",
     "@vscode/test-cli": "^0.0.4",
-    "@vscode/test-electron": "^2.3.8"
+    "@vscode/test-electron": "^2.3.8",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.3"
   }
 }
