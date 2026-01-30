@@ -32,7 +32,10 @@ export class DecorationManager {
 
     for (const group of groups) {
       for (const token of group.tokens) {
-        const spacesNeeded = group.targetColumn - token.column;
+        // Calculate where this operator ends
+        const operatorEndColumn = token.column + token.text.length;
+        // How many spaces needed to reach the target column (where values align)
+        const spacesNeeded = group.targetColumn - operatorEndColumn;
 
         if (spacesNeeded <= 0 || spacesNeeded > MAX_CACHED_WIDTH) {
           continue;
@@ -42,8 +45,8 @@ export class DecorationManager {
           rangesByWidth.set(spacesNeeded, []);
         }
 
-        // Create a zero-width range at the operator position
-        const pos = new vscode.Position(token.line, token.column);
+        // Create a zero-width range AFTER the operator
+        const pos = new vscode.Position(token.line, operatorEndColumn);
         rangesByWidth.get(spacesNeeded)!.push(new vscode.Range(pos, pos));
       }
     }

@@ -57,15 +57,19 @@ export function groupTokens(tokens: AlignmentToken[]): AlignmentGroup[] {
 
 /**
  * Creates an alignment group from a list of tokens.
- * Calculates the target column as the maximum column in the group.
+ * Calculates the target column as where values should start:
+ * the rightmost operator end position + 1 (for minimum 1 space after operator).
  */
 function createGroup(tokens: AlignmentToken[]): AlignmentGroup {
-  const maxColumn = Math.max(...tokens.map((t) => t.column));
+  // Find the rightmost position where an operator ends
+  const maxEndColumn = Math.max(...tokens.map((t) => t.column + t.text.length));
+  // Values should start 1 space after the rightmost operator
+  const targetColumn = maxEndColumn + 1;
 
   return {
     id: `${tokens[0].line}-${tokens[0].column}-${tokens[0].type}`,
     tokens,
-    targetColumn: maxColumn,
+    targetColumn,
   };
 }
 
