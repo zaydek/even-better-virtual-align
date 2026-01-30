@@ -297,7 +297,7 @@ export class ParserService {
 
       const captures = query.captures(tree.rootNode);
       const tokens: AlignmentToken[] = [];
-      
+
       // Track token index per line (for multi-operator lines like { x: 1, y: 2 })
       const tokenCountByLine: Map<number, number> = new Map();
 
@@ -325,10 +325,10 @@ export class ParserService {
         // Get indentation level of this line
         const lineText = document.lineAt(line).text;
         const indent = this.getIndentLevel(lineText);
-        
+
         // Get parent type for structural grouping
         const parentType = this.getParentType(node);
-        
+
         // Get token index on this line
         const tokenIndex = tokenCountByLine.get(line) ?? 0;
         tokenCountByLine.set(line, tokenIndex + 1);
@@ -353,8 +353,8 @@ export class ParserService {
   }
 
   /**
-   * Parses JSON using regex (fallback since @vscode/tree-sitter-wasm doesn't include JSON).
-   * JSON is simple enough that regex works reliably - no comments, simple string handling.
+   * Parses JSON using a state machine to correctly find key-value colons.
+   * This handles escaped quotes and other edge cases that regex fails on.
    */
   private parseJsonWithRegex(
     document: vscode.TextDocument,
@@ -363,59 +363,85 @@ export class ParserService {
   ): AlignmentToken[] {
     const tokens: AlignmentToken[] = [];
 
-    // Track brace depth for nesting level
-    let currentDepth = 0;
-    
     // Track token index per line
     const tokenCountByLine: Map<number, number> = new Map();
 
     for (let lineNum = 0; lineNum < document.lineCount; lineNum++) {
-      const lineText = document.lineAt(lineNum).text;
-      const indent = this.getIndentLevel(lineText);
-
-      // Update brace depth for scope tracking
-      for (let i = 0; i < lineText.length; i++) {
-        const char = lineText[i];
-        if (char === "{") {
-          currentDepth++;
-        } else if (char === "}") {
-          if (currentDepth > 0) {
-            currentDepth--;
-          }
-        }
-      }
-
       // Only process lines in range
       if (lineNum < startLine || lineNum > endLine) {
         continue;
       }
 
-      // Find "key": pattern - the colon after a string key
-      // Match: "key" followed by optional whitespace and :
-      const regex = /"[^"]*"\s*:/g;
-      let match;
+      const lineText = document.lineAt(lineNum).text;
+      const indent = this.getIndentLevel(lineText);
 
-      while ((match = regex.exec(lineText)) !== null) {
-        // Find the position of the colon
-        const colonIndex = lineText.indexOf(":", match.index + 1);
-        if (colonIndex !== -1) {
-          const tokenIndex = tokenCountByLine.get(lineNum) ?? 0;
-          tokenCountByLine.set(lineNum, tokenIndex + 1);
-          
-          tokens.push({
-            line: lineNum,
-            column: colonIndex,
-            text: ":",
-            type: ":",
-            indent,
-            parentType: "pair", // JSON key-value pairs are always "pair" type
-            tokenIndex,
-          });
-        }
+      // Find structural colons using state machine
+      const colonPositions = this.findJsonColons(lineText);
+
+      for (const colonIndex of colonPositions) {
+        const tokenIndex = tokenCountByLine.get(lineNum) ?? 0;
+        tokenCountByLine.set(lineNum, tokenIndex + 1);
+
+        tokens.push({
+          line: lineNum,
+          column: colonIndex,
+          text: ":",
+          type: ":",
+          indent,
+          parentType: "pair",
+          tokenIndex,
+        });
       }
     }
 
     return tokens;
+  }
+
+  /**
+   * State machine to find structural colons in a JSON line.
+   * Correctly handles escaped quotes and colons inside strings.
+   */
+  private findJsonColons(line: string): number[] {
+    const colonPositions: number[] = [];
+    let inString = false;
+    let escaped = false;
+    let lastStringEnd = -1;
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+
+      if (char === "\\" && inString) {
+        escaped = true;
+        continue;
+      }
+
+      if (char === '"') {
+        if (!inString) {
+          inString = true;
+        } else {
+          inString = false;
+          lastStringEnd = i;
+        }
+        continue;
+      }
+
+      // Found colon outside string - check if it follows a string key
+      if (char === ":" && !inString && lastStringEnd !== -1) {
+        // Verify only whitespace between string end and colon
+        const between = line.substring(lastStringEnd + 1, i);
+        if (/^\s*$/.test(between)) {
+          colonPositions.push(i);
+        }
+        lastStringEnd = -1; // Reset to avoid matching again
+      }
+    }
+
+    return colonPositions;
   }
 
   /**

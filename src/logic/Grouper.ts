@@ -35,20 +35,26 @@ export function groupTokens(tokens: AlignmentToken[]): AlignmentGroup[] {
     // All conditions for grouping (gofmt-style):
     // 1. Same operator type
     const sameType = curr.type === prev.type;
-    
+
     // 2. Same indentation level (handles nesting - the JSON problem)
     const sameIndent = curr.indent === prev.indent;
-    
+
     // 3. Same AST parent type (handles structural role - the TypeScript problem)
     const sameParentType = curr.parentType === prev.parentType;
-    
+
     // 4. Same token index on line (1st : with 1st :, etc.)
     const sameTokenIndex = curr.tokenIndex === prev.tokenIndex;
-    
+
     // 5. Consecutive lines (must be on adjacent lines)
     const isConsecutive = curr.line === prev.line + 1;
 
-    if (sameType && sameIndent && sameParentType && sameTokenIndex && isConsecutive) {
+    if (
+      sameType &&
+      sameIndent &&
+      sameParentType &&
+      sameTokenIndex &&
+      isConsecutive
+    ) {
       currentGroup.push(curr);
     } else {
       // Finalize current group if it has multiple tokens
