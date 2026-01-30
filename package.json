@@ -53,9 +53,9 @@
       }
     ],
     "configuration": {
-"title": "Even Better Virtual Align",
-        "properties": {
-          "evenBetterVirtualAlign.enabledLanguages": {
+      "title": "Even Better Virtual Align",
+      "properties": {
+        "evenBetterVirtualAlign.enabledLanguages": {
           "type": "object",
           "default": {
             "typescript": true,

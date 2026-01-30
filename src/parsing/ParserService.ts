@@ -255,14 +255,19 @@ export class ParserService {
       await this.ParserClass.init({
         locateFile: (file: string) => {
           const fullPath = path.join(this.wasmDir, file);
-          console.log("Even Better Virtual Align: Loading WASM file:", fullPath);
+          console.log(
+            "Even Better Virtual Align: Loading WASM file:",
+            fullPath,
+          );
           return fullPath;
         },
       });
 
       this.parser = new this.ParserClass();
       this.initialized = true;
-      console.log("Even Better Virtual Align: Tree-sitter initialized successfully");
+      console.log(
+        "Even Better Virtual Align: Tree-sitter initialized successfully",
+      );
     } catch (error) {
       console.error(
         "Even Better Virtual Align: Failed to initialize Tree-sitter:",

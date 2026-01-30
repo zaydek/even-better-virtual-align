@@ -25,8 +25,9 @@ export function groupTokens(tokens: AlignmentToken[]): AlignmentGroup[] {
 
   // Group tokens by their structural key
   // For tokenIndex 0: group broadly (type, indent, parentType, scopeId)
-  // For tokenIndex > 0: also require same operatorCountOnLine (shape-based grouping)
-  // This prevents sparse alignment in union types with varying property counts
+  // For tokenIndex > 0:
+  //   - If operatorCountOnLine > 1 (inline object): isolate by line number (no cross-object align)
+  //   - If operatorCountOnLine == 1 (multi-line block): use scopeId (allow alignment within block)
   const buckets = new Map<string, AlignmentToken[]>();
 
   for (const token of tokens) {
@@ -34,9 +35,13 @@ export function groupTokens(tokens: AlignmentToken[]): AlignmentGroup[] {
     if (token.tokenIndex === 0) {
       // First operator on line: group broadly
       key = `${token.type}|${token.indent}|${token.parentType}|${token.tokenIndex}|${token.scopeId}`;
+    } else if (token.operatorCountOnLine > 1) {
+      // Inline object (multiple operators on one line): isolate by line
+      // Each inline object is a separate type, don't align across them
+      key = `${token.type}|${token.indent}|${token.parentType}|${token.tokenIndex}|line_${token.line}`;
     } else {
-      // Subsequent operators: also match on line shape (operator count)
-      key = `${token.type}|${token.indent}|${token.parentType}|${token.tokenIndex}|${token.scopeId}|${token.operatorCountOnLine}`;
+      // Multi-line block (one operator per line): use scopeId for shared alignment
+      key = `${token.type}|${token.indent}|${token.parentType}|${token.tokenIndex}|${token.scopeId}`;
     }
     if (!buckets.has(key)) {
       buckets.set(key, []);
