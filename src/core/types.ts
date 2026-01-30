@@ -40,13 +40,14 @@ export type SupportedLanguage =
   | "typescriptreact"
   | "json"
   | "jsonc"
+  | "yaml"
   | "python";
 
 /** Check if a language ID is supported */
 export function isSupportedLanguage(
   langId: string,
 ): langId is SupportedLanguage {
-  return ["typescript", "typescriptreact", "json", "jsonc", "python"].includes(
+  return ["typescript", "typescriptreact", "json", "jsonc", "yaml", "python"].includes(
     langId,
   );
 }
@@ -55,11 +56,14 @@ export function isSupportedLanguage(
 export function getParserLanguage(langId: SupportedLanguage): string {
   switch (langId) {
     case "typescript":
-    case "typescriptreact":
       return "typescript";
+    case "typescriptreact":
+      return "tsx"; // TSX needs its own parser for JSX syntax
     case "json":
     case "jsonc":
       return "json";
+    case "yaml":
+      return "yaml";
     case "python":
       return "python";
   }

@@ -99,6 +99,37 @@ const QUERIES: Record<string, string> = {
       operator: "||" @op)
   `,
 
+  // TSX uses the same query patterns as TypeScript
+  tsx: `
+    ; Variable declarations: const x = 1
+    (variable_declarator
+      name: (_)
+      "=" @op
+      value: (_))
+
+    ; Assignment expressions: x = 1
+    (assignment_expression
+      left: (_)
+      "=" @op
+      right: (_))
+
+    ; Object properties: { key: value }
+    (pair
+      key: (_)
+      ":" @op
+      value: (_))
+
+    ; Type annotations: x: number
+    (type_annotation
+      ":" @op)
+
+    ; Logical operators
+    (binary_expression
+      operator: "&&" @op)
+    (binary_expression
+      operator: "||" @op)
+  `,
+
   python: `
     ; Assignments: x = 1
     (assignment
@@ -270,8 +301,13 @@ export class ParserService {
       return this.parseJsonWithRegex(document, startLine, endLine);
     }
 
-    // For TSX, use the tsx parser
-    const actualLang = langId === "typescriptreact" ? "tsx" : parserLang;
+    // YAML uses regex fallback (no WASM grammar available)
+    if (parserLang === "yaml") {
+      return this.parseYamlWithRegex(document, startLine, endLine);
+    }
+
+    // TSX already mapped correctly by getParserLanguage
+    const actualLang = parserLang;
 
     const loaded = await this.loadLanguage(actualLang);
     if (!loaded || !this.parser) {
@@ -438,6 +474,95 @@ export class ParserService {
           colonPositions.push(i);
         }
         lastStringEnd = -1; // Reset to avoid matching again
+      }
+    }
+
+    return colonPositions;
+  }
+
+  /**
+   * Parses YAML using regex (no WASM grammar available).
+   * YAML has unquoted keys followed by colons.
+   */
+  private parseYamlWithRegex(
+    document: vscode.TextDocument,
+    startLine: number,
+    endLine: number,
+  ): AlignmentToken[] {
+    const tokens: AlignmentToken[] = [];
+    const tokenCountByLine: Map<number, number> = new Map();
+
+    for (let lineNum = startLine; lineNum <= endLine; lineNum++) {
+      if (lineNum >= document.lineCount) break;
+
+      const lineText = document.lineAt(lineNum).text;
+      const indent = this.getIndentLevel(lineText);
+
+      // Skip comments and empty lines
+      const trimmed = lineText.trim();
+      if (trimmed.startsWith("#") || trimmed === "" || trimmed === "---" || trimmed === "...") {
+        continue;
+      }
+
+      // Find key: value patterns
+      // Match: word characters (and some special chars) followed by colon
+      // Avoid matching URLs (http://, https://) by checking what follows
+      const colonPositions = this.findYamlColons(lineText);
+
+      for (const colonIndex of colonPositions) {
+        const tokenIndex = tokenCountByLine.get(lineNum) ?? 0;
+        tokenCountByLine.set(lineNum, tokenIndex + 1);
+
+        tokens.push({
+          line: lineNum,
+          column: colonIndex,
+          text: ":",
+          type: ":",
+          indent,
+          parentType: "pair",
+          tokenIndex,
+        });
+      }
+    }
+
+    return tokens;
+  }
+
+  /**
+   * Finds structural colons in a YAML line.
+   * Handles quoted strings and avoids URLs.
+   */
+  private findYamlColons(line: string): number[] {
+    const colonPositions: number[] = [];
+    let inSingleQuote = false;
+    let inDoubleQuote = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+
+      if (char === "'" && !inDoubleQuote) {
+        inSingleQuote = !inSingleQuote;
+        continue;
+      }
+
+      if (char === '"' && !inSingleQuote) {
+        inDoubleQuote = !inDoubleQuote;
+        continue;
+      }
+
+      // Found colon outside quotes
+      if (char === ":" && !inSingleQuote && !inDoubleQuote) {
+        // Check it's not a URL (http://, https://, etc.)
+        const before = line.substring(0, i);
+        if (before.endsWith("http") || before.endsWith("https") || before.endsWith("ftp")) {
+          continue;
+        }
+
+        // Check there's a key before the colon (word characters)
+        const keyMatch = before.match(/[\w\-_.]+\s*$/);
+        if (keyMatch) {
+          colonPositions.push(i);
+        }
       }
     }
 

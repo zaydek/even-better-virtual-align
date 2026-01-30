@@ -1,8 +1,8 @@
 {
   "name": "alignment-sanity",
   "displayName": "Alignment Sanity",
-  "description": "Virtual alignment of = : && || and/or in TypeScript, JSON, and Python without modifying files",
-  "version": "2.0.0",
+  "description": "Virtual alignment of = : && || and/or in TypeScript, TSX, JSON, YAML, and Python without modifying files",
+  "version": "2.1.0",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -15,6 +15,7 @@
     "onLanguage:typescriptreact",
     "onLanguage:json",
     "onLanguage:jsonc",
+    "onLanguage:yaml",
     "onLanguage:python"
   ],
   "main": "./out/extension.js",
