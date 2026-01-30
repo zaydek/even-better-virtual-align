@@ -833,3 +833,135 @@ suite("Inline Object Alignment Tests", () => {
     assert.strictEqual(groups[0].tokens.length, 2);
   });
 });
+
+/**
+ * Inline Object Isolation Tests
+ *
+ * Tests for the rule:
+ * - Inline objects (operatorCountOnLine > 1): isolate by line, no cross-object alignment
+ * - Multi-line blocks (operatorCountOnLine == 1): use scopeId, allow alignment within block
+ */
+suite("Inline Object Isolation Tests", () => {
+  test("inline objects (2+ ops/line) don't align tokenIndex > 0 across lines", () => {
+    // | { type: ActionType.SelectCell; coordinate: CellIndex }
+    // | { type: ActionType.ExtendSelection; to: CellIndex }
+    //
+    // Both have 2 operators, but coordinate: and to: should NOT align
+    const tokens: AlignmentToken[] = [
+      // Line 0: type: at tokenIndex 0, coordinate: at tokenIndex 1
+      token(0, 8, ":", ":", {
+        indent: 2,
+        parentType: "pair",
+        tokenIndex: 0,
+        scopeId: "union",
+        operatorCountOnLine: 2,
+      }),
+      token(0, 35, ":", ":", {
+        indent: 2,
+        parentType: "pair",
+        tokenIndex: 1,
+        scopeId: "union",
+        operatorCountOnLine: 2,
+      }),
+      // Line 1: type: at tokenIndex 0, to: at tokenIndex 1
+      token(1, 8, ":", ":", {
+        indent: 2,
+        parentType: "pair",
+        tokenIndex: 0,
+        scopeId: "union",
+        operatorCountOnLine: 2,
+      }),
+      token(1, 40, ":", ":", {
+        indent: 2,
+        parentType: "pair",
+        tokenIndex: 1,
+        scopeId: "union",
+        operatorCountOnLine: 2,
+      }),
+    ];
+
+    const groups = groupTokens(tokens);
+
+    // tokenIndex 0 should form a group (type: aligns)
+    const tokenIndex0Groups = groups.filter((g) => g.tokens[0].tokenIndex === 0);
+    assert.strictEqual(tokenIndex0Groups.length, 1);
+    assert.strictEqual(tokenIndex0Groups[0].tokens.length, 2);
+
+    // tokenIndex 1 should NOT form a group (isolated by line)
+    const tokenIndex1Groups = groups.filter((g) => g.tokens[0].tokenIndex === 1);
+    assert.strictEqual(tokenIndex1Groups.length, 0);
+  });
+
+  test("multi-line blocks (1 op/line) DO align tokenIndex > 0", () => {
+    // | {
+    //     type: ActionType.LoadData;
+    //     rows: CellValue[][];
+    //     columns: ColumnConfig[];
+    //   }
+    //
+    // Each line has 1 operator, so they share scope and align
+    const tokens: AlignmentToken[] = [
+      token(0, 4, ":", ":", {
+        indent: 4,
+        parentType: "pair",
+        tokenIndex: 0,
+        scopeId: "object_1",
+        operatorCountOnLine: 1,
+      }),
+      token(1, 4, ":", ":", {
+        indent: 4,
+        parentType: "pair",
+        tokenIndex: 0,
+        scopeId: "object_1",
+        operatorCountOnLine: 1,
+      }),
+      token(2, 7, ":", ":", {
+        indent: 4,
+        parentType: "pair",
+        tokenIndex: 0,
+        scopeId: "object_1",
+        operatorCountOnLine: 1,
+      }),
+    ];
+
+    const groups = groupTokens(tokens);
+
+    // All tokens should form one group
+    assert.strictEqual(groups.length, 1);
+    assert.strictEqual(groups[0].tokens.length, 3);
+  });
+
+  test("tokenIndex 0 always aligns regardless of operatorCountOnLine", () => {
+    // Mix of inline objects and single-property lines
+    // tokenIndex 0 should still group together
+    const tokens: AlignmentToken[] = [
+      token(0, 8, ":", ":", {
+        indent: 2,
+        parentType: "pair",
+        tokenIndex: 0,
+        scopeId: "union",
+        operatorCountOnLine: 2, // inline object
+      }),
+      token(1, 8, ":", ":", {
+        indent: 2,
+        parentType: "pair",
+        tokenIndex: 0,
+        scopeId: "union",
+        operatorCountOnLine: 1, // single property
+      }),
+      token(2, 8, ":", ":", {
+        indent: 2,
+        parentType: "pair",
+        tokenIndex: 0,
+        scopeId: "union",
+        operatorCountOnLine: 3, // 3-property inline
+      }),
+    ];
+
+    const groups = groupTokens(tokens);
+
+    // All tokenIndex 0 should form one group
+    assert.strictEqual(groups.length, 1);
+    assert.strictEqual(groups[0].tokens.length, 3);
+  });
+});
