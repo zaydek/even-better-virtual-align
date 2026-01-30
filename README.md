@@ -1,53 +1,103 @@
 # Alignment Sanity
 
-A VS Code/Cursor extension that visually aligns `=`, `:`, `&&`, and `||` operators **without modifying your files**.
+Virtual code alignment for VS Code and Cursor — **without modifying your files**.
 
-![Tutorial](https://github.com/hborchardt/virtual-better-align/blob/main/images/tutorial.gif?raw=true)
+Aligns operators like `=`, `:`, `&&`, `||`, `and`, `or` visually in the editor while keeping the actual file untouched. No more whitespace pollution in your git diffs.
 
-## Why?
+## Features
 
-Vertical alignment makes code easier to scan. But inserting actual spaces pollutes your git diffs with whitespace changes on unrelated lines.
+- **Zero file modifications** — alignment is purely visual via editor decorations
+- **Go-style alignment** — colons attach to keys, values align; equals signs align together
+- **Multi-language support** — TypeScript, TSX, JSON, YAML, Python
+- **Smart grouping** — only aligns related code (same indentation, same context, consecutive lines)
+- **Tree-sitter powered** — reliable AST-based parsing, not fragile regex
 
-This extension shifts text visually in the editor only—the file on disk stays untouched.
+## Examples
 
-## What's different from the original?
+**JSON / YAML** — values align (Go style):
+```json
+{
+  "name":        "alignment-sanity",
+  "version":     "2.9.0",
+  "description": "Virtual code alignment"
+}
+```
 
-This is based on [hborchardt/virtual-better-align](https://github.com/hborchardt/virtual-better-align) with these changes:
+**Python** — operators align:
+```python
+passes   = sum(1 for s in results if s == "pass")
+warnings = sum(1 for s in results if s == "warn")
+fails    = sum(1 for s in results if s == "fail")
+```
 
-- **TypeScript/TSX only** — won't activate for other file types
-- **Ignores comments** — lines starting with `//`, `/*`, `*` are skipped
-- **Aligns `&&` and `||`** — useful for conditional class arrays:
-
+**TypeScript** — mixed operators:
 ```typescript
 const classes = [
-  isUnrecognized               && "header--unrecognized",
-  hasErrors && !isUnrecognized && "header--error",
-  isEditing                    && "header--editing",
-  isSelected                   && "header--selected",
+  isError    && "text-red",
+  isWarning  && "text-yellow",
+  isSuccess  && "text-green",
 ]
 ```
 
 ## Installation
 
-```bash
-curl -LO https://raw.githubusercontent.com/zaydek/alignment-sanity/main/alignment-sanity-1.0.0.vsix
-cursor --install-extension alignment-sanity-1.0.0.vsix
-```
+Download the latest `.vsix` from [Releases](https://github.com/zaydek/alignment-sanity/releases) and install:
 
-Or for VS Code:
 ```bash
-code --install-extension alignment-sanity-1.0.0.vsix
+# Cursor
+cursor --install-extension alignment-sanity-2.9.0.vsix
+
+# VS Code
+code --install-extension alignment-sanity-2.9.0.vsix
 ```
 
 ## Usage
 
-The extension activates automatically for `.ts` and `.tsx` files.
+The extension activates automatically for supported file types.
 
-Toggle it off/on via Command Palette: **"Alignment Sanity: Toggle active"**
+### Toggle Alignment
+
+- **Keyboard**: `⌘⇧A` (Cmd+Shift+A)
+- **Command Palette**: `Alignment Sanity: Toggle`
+- **Status Bar**: Click the "✓ Align" / "✗ Align" indicator
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `Alignment Sanity: Toggle` | Switch alignment on/off |
+| `Alignment Sanity: Enable` | Explicitly enable |
+| `Alignment Sanity: Disable` | Explicitly disable |
+
+## Supported Languages
+
+| Language | Operators |
+|----------|-----------|
+| TypeScript / TSX | `=` `:` `&&` `\|\|` |
+| JSON / JSONC | `:` |
+| YAML | `:` |
+| Python | `=` `:` `and` `or` |
+
+## How It Works
+
+1. **Tree-sitter parsing** — The document is parsed into an AST to find operators in their proper context
+2. **Smart grouping** — Operators are grouped by type, indentation, AST parent, and consecutive lines (like `gofmt`)
+3. **Visual decorations** — VS Code decorations insert invisible spacing to align text without changing the file
+
+## Alignment Style
+
+The extension uses Go-style alignment rules:
+
+- **For `:`** — Colon stays attached to the key, padding is added *after* to align values
+- **For `=`, `&&`, `||`** — Padding is added *before* to align the operators themselves
+
+This matches how `gofmt` formats Go code.
 
 ## Credits
 
-Original extension by [@hborchardt](https://github.com/hborchardt) — [virtual-better-align](https://github.com/hborchardt/virtual-better-align)
+Inspired by [virtual-better-align](https://github.com/hborchardt/virtual-better-align) by [@hborchardt](https://github.com/hborchardt).
+
+Rebuilt from scratch with Tree-sitter for reliability and multi-language support.
 
 ## License
 
