@@ -42,50 +42,118 @@ Alignment Sanity renders alignment **visually** while keeping your files untouch
 - **Go-Style Rules:**
   - **Colons (`:`)**: Attached to the key; padding added *after* to align values.
   - **Operators (`=`, `&&`, `||`)**: Padding added *before* to align the operators.
-- **Multi-Language:** Native support for TypeScript, TSX, JSON, YAML, and Python.
+- **Multi-Language:** Native support for TypeScript, TSX, JSON, YAML, Python, CSS, SCSS, and Less.
 
 ---
 
 ## Visual Examples
 
-### JSON / YAML
+### Data & Configuration
 
-Values align after the colon, keeping keys distinct.
+*Perfect for aligning keys in JSON, YAML, and TypeScript interfaces. Padding added **after** colons.*
 
+**Package Configuration** (JSON)
 ```json
 {
-  "name":        "alignment-sanity",
-  "version":     "2.9.0",
-  "description": "Virtual code alignment"
+  "name":        "enterprise-dashboard",
+  "version":     "2.4.0",
+  "description": "Real-time analytics and monitoring platform",
+  "main":        "dist/server.js",
+  "license":     "MIT",
+  "private":     true
 }
 ```
 
-### Python
-
-Assignments align cleanly by padding *before* the operator.
-
-```python
-passes   = sum(1 for s in results if s == "pass")
-warnings = sum(1 for s in results if s == "warn")
-fails    = sum(1 for s in results if s == "fail")
+**Kubernetes Spec** (YAML)
+```yaml
+spec:
+  replicas:        3
+  strategy:        RollingUpdate
+  revisionHistory: 10
+  selector:
+    app:           backend
+    tier:          production
 ```
 
-### TypeScript / TSX
-
-Mixed alignment handles object properties and logical operators intelligently.
-
+**Type Definitions** (TypeScript)
 ```typescript
-const classes = [
-  isError   && "text-red",    // Operators align
-  isWarning && "text-yellow",
-  isSuccess && "text-green",
-];
+interface UserProfile {
+  id:              string;
+  email:           string;
+  displayName:     string;
+  avatarUrl:       string | null;
+  isVerified:      boolean;
+  lastLogin:       Date;
+  role:            "admin" | "editor" | "viewer";
+}
+```
 
-const config = {
-  name:    "app",             // Values align
-  version: "1.0",
-  debug:   true,
-};
+### Logic & Conditions
+
+*Clarify complex logic by aligning operators. Padding added **before** `=`, `&&`, `||`, etc.*
+
+**Environment Setup** (Python)
+```python
+DEBUG        = os.getenv("DEBUG", "false") == "true"
+SECRET_KEY   = os.getenv("SECRET_KEY", "dev-secret")
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///app.db")
+REDIS_HOST   = os.getenv("REDIS_HOST", "localhost")
+API_TIMEOUT  = int(os.getenv("API_TIMEOUT", "30"))
+```
+
+**Conditional Classes** (TSX / React)
+```tsx
+const buttonClasses = clsx(
+  "px-4 py-2 rounded transition-all",
+  isPrimary    && "bg-blue-600 text-white hover:bg-blue-700",
+  isSecondary  && "bg-gray-100 text-gray-900 hover:bg-gray-200",
+  isLoading    && "opacity-75 cursor-wait",
+  isDisabled   && "opacity-50 pointer-events-none"
+);
+```
+
+**Guard Clauses** (TypeScript)
+```typescript
+const canSubmit =
+  isFormValid              &&
+  !isSubmitting            &&
+  hasAgreedToTerms         &&
+  (hasCredit || isFreeTier);
+```
+
+### Styling & Theming
+
+*Create clean, readable style definitions and token maps.*
+
+**Component Styles** (CSS)
+```css
+.card-container {
+  position:        relative;
+  display:         flex;
+  flex-direction:  column;
+  padding:         1.5rem;
+  background:      var(--surface-1);
+  border-radius:   0.5rem;
+  box-shadow:      0 4px 6px -1px rgb(0 0 0 / 0.1);
+}
+```
+
+**Design Tokens** (SCSS)
+```scss
+$color-primary:   #3b82f6;
+$color-danger:    #ef4444;
+$color-success:   #22c55e;
+$spacing-unit:    0.25rem;
+$font-stack:      'Inter', system-ui, sans-serif;
+```
+
+**Responsive Breakpoints** (Less)
+```less
+@screen-sm:       640px;
+@screen-md:       768px;
+@screen-lg:       1024px;
+@screen-xl:       1280px;
+@container-max:   1440px;
 ```
 
 ---
