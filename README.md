@@ -50,41 +50,38 @@ Alignment Sanity renders alignment **visually** while keeping your files untouch
 
 ### Data & Configuration
 
-*Perfect for aligning keys in JSON, YAML, and TypeScript interfaces. Padding added **after** colons.*
+*Aligns keys at the same indentation level. Nested blocks form separate alignment groups.*
 
 **Package Configuration** (JSON)
 ```json
 {
   "name":        "enterprise-dashboard",
   "version":     "2.4.0",
-  "description": "Real-time analytics and monitoring platform",
+  "description": "Real-time analytics platform",
   "main":        "dist/server.js",
-  "license":     "MIT",
-  "private":     true
+  "license":     "MIT"
 }
 ```
 
-**Kubernetes Spec** (YAML)
+**Nested Structures** (YAML)
 ```yaml
+# Each indentation level aligns independently
 spec:
-  replicas:        3
-  strategy:        RollingUpdate
-  revisionHistory: 10
+  replicas: 3
+  strategy: RollingUpdate
   selector:
-    app:           backend
-    tier:          production
+    app:  backend    # Nested group - aligns separately
+    tier: production
 ```
 
 **Type Definitions** (TypeScript)
 ```typescript
 interface UserProfile {
-  id:              string;
-  email:           string;
-  displayName:     string;
-  avatarUrl:       string | null;
-  isVerified:      boolean;
-  lastLogin:       Date;
-  role:            "admin" | "editor" | "viewer";
+  id:          string;
+  email:       string;
+  displayName: string;
+  avatarUrl:   string | null;
+  isVerified:  boolean;
 }
 ```
 
@@ -127,24 +124,21 @@ const canSubmit =
 
 **Component Styles** (CSS)
 ```css
-.card-container {
-  position:        relative;
-  display:         flex;
-  flex-direction:  column;
-  padding:         1.5rem;
-  background:      var(--surface-1);
-  border-radius:   0.5rem;
-  box-shadow:      0 4px 6px -1px rgb(0 0 0 / 0.1);
+.card {
+  position:       relative;
+  display:        flex;
+  flex-direction: column;
+  padding:        1.5rem;
+  border-radius:  0.5rem;
 }
 ```
 
 **Design Tokens** (SCSS)
 ```scss
-$color-primary:   #3b82f6;
-$color-danger:    #ef4444;
-$color-success:   #22c55e;
-$spacing-unit:    0.25rem;
-$font-stack:      'Inter', system-ui, sans-serif;
+$color-primary: #3b82f6;
+$color-danger:  #ef4444;
+$color-success: #22c55e;
+$spacing-unit:  0.25rem;
 ```
 
 **Responsive Breakpoints** (Less)

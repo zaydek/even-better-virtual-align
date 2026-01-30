@@ -187,6 +187,65 @@ suite("Grouper Tests", () => {
     assert.strictEqual(groups[1].tokens[0].tokenIndex, 1);
     assert.strictEqual(groups[1].tokens[1].tokenIndex, 1);
   });
+
+  test("YAML nested structure: each indent level aligns independently", () => {
+    // Simulating:
+    // spec:
+    //   replicas: 3
+    //   strategy: RollingUpdate
+    //   selector:
+    //     app:  backend
+    //     tier: production
+    const tokens: AlignmentToken[] = [
+      // Level 1 (indent 0): spec:
+      token(0, 4, ":", ":", { indent: 0, parentType: "pair", tokenIndex: 0 }),
+      // Level 2 (indent 2): replicas, strategy, selector
+      token(1, 10, ":", ":", { indent: 2, parentType: "pair", tokenIndex: 0 }), // replicas:
+      token(2, 10, ":", ":", { indent: 2, parentType: "pair", tokenIndex: 0 }), // strategy:
+      token(3, 10, ":", ":", { indent: 2, parentType: "pair", tokenIndex: 0 }), // selector:
+      // Level 3 (indent 4): app, tier
+      token(4, 7, ":", ":", { indent: 4, parentType: "pair", tokenIndex: 0 }), // app:
+      token(5, 8, ":", ":", { indent: 4, parentType: "pair", tokenIndex: 0 }), // tier:
+    ];
+
+    const groups = groupTokens(tokens);
+
+    // Should form 2 groups:
+    // - Group 1: replicas, strategy, selector (indent 2, consecutive lines 1-3)
+    // - Group 2: app, tier (indent 4, consecutive lines 4-5)
+    // Note: spec: at line 0 is alone (different indent from line 1)
+    assert.strictEqual(groups.length, 2);
+
+    // First group: replicas, strategy, selector
+    assert.strictEqual(groups[0].tokens.length, 3);
+    assert.strictEqual(groups[0].tokens[0].indent, 2);
+    assert.strictEqual(groups[0].tokens[1].indent, 2);
+    assert.strictEqual(groups[0].tokens[2].indent, 2);
+
+    // Second group: app, tier
+    assert.strictEqual(groups[1].tokens.length, 2);
+    assert.strictEqual(groups[1].tokens[0].indent, 4);
+    assert.strictEqual(groups[1].tokens[1].indent, 4);
+  });
+
+  test("padAfter is true for colon operators, false for equals", () => {
+    const colonTokens: AlignmentToken[] = [
+      token(0, 5, ":", ":", { indent: 0, parentType: "pair" }),
+      token(1, 10, ":", ":", { indent: 0, parentType: "pair" }),
+    ];
+    const equalsTokens: AlignmentToken[] = [
+      token(0, 5, "=", "=", { indent: 0, parentType: "assignment" }),
+      token(1, 10, "=", "=", { indent: 0, parentType: "assignment" }),
+    ];
+
+    const colonGroups = groupTokens(colonTokens);
+    const equalsGroups = groupTokens(equalsTokens);
+
+    // Colons pad after
+    assert.strictEqual(colonGroups[0].padAfter, true);
+    // Equals pad before
+    assert.strictEqual(equalsGroups[0].padAfter, false);
+  });
 });
 
 suite("Types Tests", () => {
@@ -196,7 +255,11 @@ suite("Types Tests", () => {
     assert.strictEqual(isSupportedLanguage("typescriptreact"), true);
     assert.strictEqual(isSupportedLanguage("json"), true);
     assert.strictEqual(isSupportedLanguage("jsonc"), true);
+    assert.strictEqual(isSupportedLanguage("yaml"), true);
     assert.strictEqual(isSupportedLanguage("python"), true);
+    assert.strictEqual(isSupportedLanguage("css"), true);
+    assert.strictEqual(isSupportedLanguage("scss"), true);
+    assert.strictEqual(isSupportedLanguage("less"), true);
   });
 
   test("isSupportedLanguage returns false for unsupported languages", () => {
