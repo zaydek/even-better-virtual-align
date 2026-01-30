@@ -232,7 +232,7 @@ cursor --install-extension alignment-sanity-*.vsix
 
 ## Credits
 
-Inspired by [virtual-better-align](https://github.com/hborchardt/virtual-better-align). Rebuilt from scratch using **Tree-sitter** for reliable, AST-based parsing.
+Inspired by [virtual-better-align](https://github.com/hborchardt/virtual-better-align), which is based on [better-align](https://github.com/chouzz/vscode-better-align). Rebuilt from scratch using **Tree-sitter** for reliable, AST-based parsing.
 
 ---
 
