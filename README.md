@@ -60,7 +60,7 @@ _Aligns keys at the same indentation level. Nested blocks form separate alignmen
 
 **Package Configuration** (JSON)
 
-```
+```json
 {
   "name":        "enterprise-dashboard",
   "version":     "2.4.0",
@@ -72,7 +72,7 @@ _Aligns keys at the same indentation level. Nested blocks form separate alignmen
 
 **Nested Structures** (YAML)
 
-```
+```yaml
 # Each indentation level aligns independently
 spec:
   replicas: 3
@@ -84,7 +84,7 @@ spec:
 
 **Type Definitions** (TypeScript)
 
-```
+```typescript
 interface UserProfile {
   id:          string;
   email:       string;
@@ -110,7 +110,7 @@ API_TIMEOUT  = int(os.getenv("API_TIMEOUT", "30"))
 
 **Conditional Classes** (TSX / React)
 
-```
+```tsx
 const buttonClasses = clsx(
   "px-4 py-2 rounded transition-all",
   isPrimary   && "bg-blue-600 text-white hover:bg-blue-700",
@@ -122,7 +122,7 @@ const buttonClasses = clsx(
 
 **Guard Clauses** (TypeScript)
 
-```
+```typescript
 const canSubmit =
   isFormValid      &&
   !isSubmitting    &&
@@ -136,7 +136,7 @@ _Create clean, readable style definitions and token maps._
 
 **Component Styles** (CSS)
 
-```
+```css
 .card {
   position:       relative;
   display:        flex;
@@ -148,7 +148,7 @@ _Create clean, readable style definitions and token maps._
 
 **Design Tokens** (SCSS)
 
-```
+```scss
 $color-primary: #3b82f6;
 $color-danger:  #ef4444;
 $color-success: #22c55e;
@@ -157,7 +157,7 @@ $spacing-unit:  0.25rem;
 
 **Responsive Breakpoints** (Less)
 
-```
+```less
 @screen-sm:     640px;
 @screen-md:     768px;
 @screen-lg:     1024px;
