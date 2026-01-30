@@ -23,27 +23,139 @@ export class DecorationManager {
   /**
    * Updates decorations for an editor based on alignment groups.
    *
-   * Two-pass algorithm to handle accumulated shift:
-   * 1. First pass: Calculate padding for non-comment operators, track per-line shift
-   * 2. Second pass: Calculate comment padding accounting for accumulated shift
+   * Multi-pass algorithm to handle accumulated shift:
+   * 1. Process funcArg groups column-by-column (Column-Based Sweep)
+   * 2. Process regular operators, tracking per-line shift
+   * 3. Process comments accounting for accumulated shift
    */
   update(editor: vscode.TextEditor, groups: AlignmentGroup[]): void {
     // Clear existing decorations for this editor
     this.clear(editor);
 
-    // Separate comment groups from regular groups
+    // Separate groups by type
     const commentGroups = groups.filter((g) => g.tokens[0]?.type === "//");
-    const regularGroups = groups.filter((g) => g.tokens[0]?.type !== "//");
+    const funcArgGroups = groups.filter((g) => g.tokens[0]?.type === "funcArg");
+    const regularGroups = groups.filter(
+      (g) => g.tokens[0]?.type !== "//" && g.tokens[0]?.type !== "funcArg",
+    );
 
-    // Track accumulated "padAfter" shift per line
-    // This is the total visual shift caused by padding inserted AFTER operators
+    // Track accumulated shift per line (from all padding)
     const lineShift = new Map<number, number>();
 
     // Batch ranges by width for efficient decoration application
     const rangesByWidth = new Map<number, vscode.Range[]>();
 
-    // --- PASS 1: Process regular operators ---
-    for (const group of regularGroups) {
+    // --- PASS 1: Process funcArg groups using Column-Based Sweep ---
+    // Group funcArg tokens by scope, then process column-by-column
+    const funcArgByScope = new Map<string, AlignmentGroup[]>();
+    for (const group of funcArgGroups) {
+      const scopeId = group.tokens[0]?.scopeId ?? "default";
+      if (!funcArgByScope.has(scopeId)) {
+        funcArgByScope.set(scopeId, []);
+      }
+      funcArgByScope.get(scopeId)!.push(group);
+    }
+
+    for (const scopeGroups of funcArgByScope.values()) {
+      // Sort groups by tokenIndex (column order)
+      scopeGroups.sort(
+        (a, b) => a.tokens[0].tokenIndex - b.tokens[0].tokenIndex,
+      );
+
+      // Track shift per line within this scope
+      const scopeLineShift = new Map<number, number>();
+
+      // Process each column (tokenIndex) left-to-right
+      for (const group of scopeGroups) {
+        // Calculate visual end positions accounting for accumulated shift
+        let maxVisualEnd = 0;
+        const tokenVisualEnds: Array<{
+          token: (typeof group.tokens)[0];
+          visualEnd: number;
+        }> = [];
+
+        for (const token of group.tokens) {
+          const shift = scopeLineShift.get(token.line) ?? 0;
+          const visualEnd = token.column + token.text.length + shift;
+          tokenVisualEnds.push({ token, visualEnd });
+          if (visualEnd > maxVisualEnd) {
+            maxVisualEnd = visualEnd;
+          }
+        }
+
+        // Apply padding and update shifts
+        for (const { token, visualEnd } of tokenVisualEnds) {
+          const spacesNeeded = maxVisualEnd - visualEnd;
+
+          if (spacesNeeded > 0 && spacesNeeded <= MAX_CACHED_WIDTH) {
+            // Pad BEFORE the token (right-align)
+            const shift = scopeLineShift.get(token.line) ?? 0;
+            const visualColumn = token.column + shift;
+            const pos = new vscode.Position(token.line, visualColumn);
+
+            if (!rangesByWidth.has(spacesNeeded)) {
+              rangesByWidth.set(spacesNeeded, []);
+            }
+            rangesByWidth.get(spacesNeeded)!.push(new vscode.Range(pos, pos));
+
+            // Update accumulated shift for this line
+            const currentShift = scopeLineShift.get(token.line) ?? 0;
+            scopeLineShift.set(token.line, currentShift + spacesNeeded);
+          }
+        }
+      }
+
+      // Merge scope shifts into global lineShift for comment alignment
+      for (const [line, shift] of scopeLineShift) {
+        const current = lineShift.get(line) ?? 0;
+        lineShift.set(line, current + shift);
+      }
+    }
+
+    // --- PASS 2: Process regular operators ---
+    // Separate function_arguments commas (need shift adjustment) from other operators
+    const funcArgCommaGroups = regularGroups.filter(
+      (g) => g.tokens[0]?.parentType === "function_arguments",
+    );
+    const otherRegularGroups = regularGroups.filter(
+      (g) => g.tokens[0]?.parentType !== "function_arguments",
+    );
+
+    // Process function_arguments commas with shift adjustment (like comments)
+    for (const group of funcArgCommaGroups) {
+      // Recalculate target column using VISUAL positions
+      const visualEndColumns = group.tokens.map((t) => {
+        const shift = lineShift.get(t.line) ?? 0;
+        return t.column + t.text.length + shift;
+      });
+      const targetVisualEndColumn = Math.max(...visualEndColumns);
+
+      for (const token of group.tokens) {
+        const shift = lineShift.get(token.line) ?? 0;
+        const currentVisualEndColumn = token.column + token.text.length + shift;
+        const spacesNeeded = targetVisualEndColumn - currentVisualEndColumn;
+
+        if (spacesNeeded <= 0 || spacesNeeded > MAX_CACHED_WIDTH) {
+          continue;
+        }
+
+        // Pad AFTER the comma (padAfter = true for commas)
+        const visualColumn = token.column + token.text.length + shift;
+        const pos = new vscode.Position(token.line, visualColumn);
+
+        if (!rangesByWidth.has(spacesNeeded)) {
+          rangesByWidth.set(spacesNeeded, []);
+        }
+        rangesByWidth.get(spacesNeeded)!.push(new vscode.Range(pos, pos));
+
+        // Track this shift
+        const currentShift = lineShift.get(token.line) ?? 0;
+        lineShift.set(token.line, currentShift + spacesNeeded);
+      }
+    }
+
+    // Process other regular operators normally
+    for (const group of otherRegularGroups) {
       for (const token of group.tokens) {
         let spacesNeeded: number;
         let pos: vscode.Position;
@@ -77,7 +189,7 @@ export class DecorationManager {
       }
     }
 
-    // --- PASS 2: Process comment groups with shift adjustment ---
+    // --- PASS 3: Process comment groups with shift adjustment ---
     for (const group of commentGroups) {
       // Recalculate target column using VISUAL positions
       // Visual position = original column + accumulated shift

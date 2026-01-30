@@ -106,6 +106,11 @@ const QUERIES: Record<string, string> = {
 
     ; Trailing comments: // comment
     (comment) @op
+
+    ; Function calls: func(arg1, arg2, ...)
+    (call_expression
+      function: [(identifier) @func_name (member_expression property: (property_identifier) @func_name)]
+      arguments: (arguments) @func_args) @func_call
   `,
 
   // TSX uses the same query patterns as TypeScript
@@ -146,6 +151,11 @@ const QUERIES: Record<string, string> = {
 
     ; Trailing comments: // comment
     (comment) @op
+
+    ; Function calls: func(arg1, arg2, ...)
+    (call_expression
+      function: [(identifier) @func_name (member_expression property: (property_identifier) @func_name)]
+      arguments: (arguments) @func_args) @func_call
   `,
 
   python: `
@@ -488,6 +498,140 @@ export class ParserService {
             indent: colons[0].indent,
             parentType: "inline_object", // Special parent type for inline object commas
             scopeId: colons[0].scopeId, // Inherit scope from the colons
+          });
+        }
+      }
+
+      // Find function calls and add argument comma tokens
+      // Collect function call data from captures
+      interface FuncCallData {
+        line: number;
+        funcName: string;
+        argsText: string;
+        argsStartCol: number;
+        indent: number;
+      }
+      const funcCalls: FuncCallData[] = [];
+
+      // Group captures by their parent call_expression node ID
+      const callCaptures = new Map<
+        number,
+        { funcName?: string; argsNode?: TreeNode; callNode?: TreeNode }
+      >();
+      for (const capture of captures) {
+        if (
+          capture.name === "func_name" ||
+          capture.name === "func_args" ||
+          capture.name === "func_call"
+        ) {
+          // Find the call_expression ancestor
+          let callNode = capture.node;
+          while (callNode && callNode.type !== "call_expression") {
+            callNode = callNode.parent!;
+          }
+          if (!callNode) continue;
+
+          const callId = callNode.id;
+          if (!callCaptures.has(callId)) {
+            callCaptures.set(callId, {});
+          }
+          const data = callCaptures.get(callId)!;
+
+          if (capture.name === "func_name") {
+            data.funcName = capture.node.text;
+          } else if (capture.name === "func_args") {
+            data.argsNode = capture.node;
+          } else if (capture.name === "func_call") {
+            data.callNode = capture.node;
+          }
+        }
+      }
+
+      // Process collected function calls
+      for (const [, data] of callCaptures) {
+        if (!data.funcName || !data.argsNode || !data.callNode) continue;
+
+        const line = data.callNode.startPosition.row;
+        if (line < startLine || line > endLine) continue;
+
+        const lineText = document.lineAt(line).text;
+        const indent = this.getIndentLevel(lineText);
+
+        funcCalls.push({
+          line,
+          funcName: data.funcName,
+          argsText: data.argsNode.text,
+          argsStartCol: data.argsNode.startPosition.column,
+          indent,
+        });
+      }
+
+      // Group consecutive function calls by (funcName, indent)
+      // Extract:
+      // 1. NUMERIC argument values for right-alignment (funcArg)
+      // 2. Commas for left-alignment of non-numeric arguments
+      funcCalls.sort((a, b) => a.line - b.line);
+
+      for (const call of funcCalls) {
+        // Extract argument values (start position and text)
+        const argsContent = call.argsText;
+        const args = this.extractFunctionArguments(argsContent);
+
+        // Find comma positions between arguments
+        const commaPositions = this.findFunctionArgumentCommas(argsContent);
+
+        // Use function name + indent as scope
+        // This allows consecutive calls to the same function to align
+        const scopeId = `func_${call.funcName}_${call.indent}`;
+
+        // Track which argument positions have numeric values (for funcArg)
+        const numericArgIndices = new Set<number>();
+
+        for (let i = 0; i < args.length; i++) {
+          const arg = args[i];
+
+          // Only emit funcArg tokens for NUMERIC arguments
+          // Numbers look good right-aligned, strings don't
+          if (this.isNumericLiteral(arg.text)) {
+            numericArgIndices.add(i);
+
+            // Convert relative column (within args) to absolute column
+            const absoluteCol = call.argsStartCol + arg.startCol;
+
+            captureData.push({
+              line: call.line,
+              column: absoluteCol,
+              text: arg.text,
+              type: "funcArg",
+              indent: call.indent,
+              parentType: "function_arguments",
+              scopeId,
+            });
+          }
+        }
+
+        // Add comma tokens for left-alignment
+        // Skip commas that precede numeric arguments (those use funcArg right-alignment)
+        for (let i = 0; i < commaPositions.length; i++) {
+          const commaCol = commaPositions[i];
+          const nextArgIndex = i + 1; // Comma i separates arg i from arg i+1
+
+          // If the NEXT argument is numeric, skip this comma
+          // (funcArg will handle alignment for that position)
+          if (numericArgIndices.has(nextArgIndex)) {
+            continue;
+          }
+
+          const absoluteCol = call.argsStartCol + commaCol;
+
+          captureData.push({
+            line: call.line,
+            column: absoluteCol,
+            text: ",",
+            type: ",",
+            indent: call.indent,
+            parentType: "function_arguments",
+            scopeId,
           });
         }
       }
@@ -1077,6 +1221,214 @@ export class ParserService {
     }
 
     return tokens;
+  }
+
+  /**
+   * Checks if a string is a numeric literal.
+   * Matches integers, decimals, negative numbers, hex, binary, octal, etc.
+   */
+  private isNumericLiteral(text: string): boolean {
+    // Integer: 42, -42
+    // Decimal: 3.14, -3.14, .5
+    // Hex: 0x1A, 0X1a
+    // Binary: 0b101
+    // Octal: 0o17
+    // Scientific: 1e10, 1.5e-3
+    // Underscore separators: 1_000_000
+    const numericPattern =
+      /^-?(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|(?:\d[\d_]*\.?[\d_]*|\.\d[\d_]*)(?:[eE][+-]?\d[\d_]*)?)$/;
+    return numericPattern.test(text);
+  }
+
+  /**
+   * Finds commas between function arguments.
+   * The input is the text of the arguments node (including parentheses).
+   * Returns relative column positions of commas within the args text.
+   */
+  private findFunctionArgumentCommas(argsText: string): number[] {
+    const commaPositions: number[] = [];
+    let inString = false;
+    let stringChar = "";
+    let escaped = false;
+    let depth = 0;
+
+    for (let i = 0; i < argsText.length; i++) {
+      const char = argsText[i];
+
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+
+      if (char === "\\" && inString) {
+        escaped = true;
+        continue;
+      }
+
+      if ((char === '"' || char === "'" || char === "`") && !inString) {
+        inString = true;
+        stringChar = char;
+        continue;
+      }
+
+      if (char === stringChar && inString) {
+        inString = false;
+        stringChar = "";
+        continue;
+      }
+
+      if (inString) continue;
+
+      if (char === "(" || char === "{" || char === "[") {
+        depth++;
+        continue;
+      }
+      if (char === ")" || char === "}" || char === "]") {
+        depth--;
+        continue;
+      }
+
+      // Found a comma at depth 1 (inside the outermost parens)
+      if (char === "," && depth === 1) {
+        commaPositions.push(i);
+      }
+    }
+
+    return commaPositions;
+  }
+
+  /**
+   * Extracts function argument values with their positions.
+   * The input is the text of the arguments node (including parentheses).
+   * Returns array of {startCol, text} for each argument.
+   */
+  private extractFunctionArguments(
+    argsText: string,
+  ): Array<{ startCol: number; text: string }> {
+    const args: Array<{ startCol: number; text: string }> = [];
+    let inString = false;
+    let stringChar = "";
+    let escaped = false;
+    let depth = 0;
+
+    let argStart = -1; // Start of current argument
+    let argContent = ""; // Content of current argument
+
+    for (let i = 0; i < argsText.length; i++) {
+      const char = argsText[i];
+
+      if (escaped) {
+        escaped = false;
+        if (depth === 1 && argStart !== -1) {
+          argContent += char;
+        }
+        continue;
+      }
+
+      if (char === "\\" && inString) {
+        escaped = true;
+        if (depth === 1 && argStart !== -1) {
+          argContent += char;
+        }
+        continue;
+      }
+
+      if ((char === '"' || char === "'" || char === "`") && !inString) {
+        inString = true;
+        stringChar = char;
+        if (depth === 1) {
+          if (argStart === -1) {
+            argStart = i;
+          }
+          argContent += char;
+        }
+        continue;
+      }
+
+      if (char === stringChar && inString) {
+        inString = false;
+        stringChar = "";
+        if (depth === 1 && argStart !== -1) {
+          argContent += char;
+        }
+        continue;
+      }
+
+      if (inString) {
+        if (depth === 1 && argStart !== -1) {
+          argContent += char;
+        }
+        continue;
+      }
+
+      // Track nesting
+      if (char === "(") {
+        depth++;
+        if (depth > 1 && argStart !== -1) {
+          argContent += char;
+        }
+        continue;
+      }
+      if (char === "{" || char === "[") {
+        if (depth === 1 && argStart === -1) {
+          argStart = i;
+        }
+        depth++;
+        if (argStart !== -1) {
+          argContent += char;
+        }
+        continue;
+      }
+      if (char === ")" || char === "}" || char === "]") {
+        if (char === ")" && depth === 1) {
+          // End of arguments - finalize last arg
+          if (argStart !== -1) {
+            const trimmedContent = argContent.trim();
+            if (trimmedContent.length > 0) {
+              // Find the actual start (skip leading whitespace)
+              const leadingWs =
+                argContent.length - argContent.trimStart().length;
+              args.push({
+                startCol: argStart + leadingWs,
+                text: trimmedContent,
+              });
+            }
+          }
+        } else if (argStart !== -1) {
+          argContent += char;
+        }
+        depth--;
+        continue;
+      }
+
+      // At depth 1: we're inside the function's argument list
+      if (depth === 1) {
+        if (char === ",") {
+          // End of current argument
+          if (argStart !== -1) {
+            const trimmedContent = argContent.trim();
+            if (trimmedContent.length > 0) {
+              const leadingWs =
+                argContent.length - argContent.trimStart().length;
+              args.push({
+                startCol: argStart + leadingWs,
+                text: trimmedContent,
+              });
+            }
+          }
+          argStart = -1;
+          argContent = "";
+        } else if (char !== " " && char !== "\t" && argStart === -1) {
+          // Start of a new argument (first non-whitespace)
+          argStart = i;
+          argContent = char;
+        } else if (argStart !== -1) {
+          argContent += char;
+        }
+      }
+    }
+
+    return args;
   }
 
   /**

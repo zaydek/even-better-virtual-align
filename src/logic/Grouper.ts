@@ -35,12 +35,17 @@ export function groupTokens(tokens: AlignmentToken[]): AlignmentGroup[] {
     if (token.tokenIndex === 0) {
       // First operator on line: group broadly
       key = `${token.type}|${token.indent}|${token.parentType}|${token.tokenIndex}|${token.scopeId}`;
-    } else if (token.operatorCountOnLine > 1) {
+    } else if (
+      token.operatorCountOnLine > 1 &&
+      token.parentType !== "function_arguments"
+    ) {
       // Inline object (multiple operators on one line): isolate by line
       // Each inline object is a separate type, don't align across them
+      // Exception: function_arguments should align across lines (that's the whole point)
       key = `${token.type}|${token.indent}|${token.parentType}|${token.tokenIndex}|line_${token.line}`;
     } else {
       // Multi-line block (one operator per line): use scopeId for shared alignment
+      // Also applies to function_arguments regardless of operatorCountOnLine
       key = `${token.type}|${token.indent}|${token.parentType}|${token.tokenIndex}|${token.scopeId}`;
     }
     if (!buckets.has(key)) {
@@ -107,6 +112,10 @@ export function groupTokens(tokens: AlignmentToken[]): AlignmentGroup[] {
  * For `=`, `&&`, `||` operators: Pad BEFORE the operator so OPERATORS align.
  *   passes   = sum(...)  <- operator at column 9
  *   warnings = sum(...)  <- operator at column 9
+ *
+ * For `funcArg` (function argument values): Pad BEFORE so values RIGHT-align.
+ *   token(0,  8, ...)  <- 8 gets 1 space before to align with 15
+ *   token(0, 15, ...)  <- 15 at rightmost position
  */
 function createGroup(tokens: AlignmentToken[]): AlignmentGroup {
   const operatorType = tokens[0].type;
@@ -116,7 +125,15 @@ function createGroup(tokens: AlignmentToken[]): AlignmentGroup {
 
   let targetColumn: number;
 
-  if (padAfter) {
+  if (operatorType === "funcArg") {
+    // For function arguments: right-align by END position
+    // targetColumn = max end position (where the rightmost argument ends)
+    // spacesNeeded = targetColumn - thisEndColumn (calculated in decorator)
+    const maxEndColumn = Math.max(
+      ...tokens.map((t) => t.column + t.text.length),
+    );
+    targetColumn = maxEndColumn;
+  } else if (padAfter) {
     // For `:`, find the rightmost position where an operator ENDS
     // Values should all start at the same column after this
     const maxEndColumn = Math.max(

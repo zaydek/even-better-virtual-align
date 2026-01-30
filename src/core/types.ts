@@ -4,7 +4,16 @@
  */
 
 /** Supported operator types across all languages */
-export type OperatorType = "=" | ":" | "," | "&&" | "||" | "and" | "or" | "//";
+export type OperatorType =
+  | "="
+  | ":"
+  | ","
+  | "&&"
+  | "||"
+  | "and"
+  | "or"
+  | "//"
+  | "funcArg"; // Function argument value (for right-alignment)
 
 /** A single alignable operator found in the document */
 export interface AlignmentToken {
