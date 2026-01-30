@@ -50,7 +50,8 @@ export type SupportedLanguage =
   | "python"
   | "css"
   | "scss"
-  | "less";
+  | "less"
+  | "markdown";
 
 /** All supported languages for configuration */
 export const ALL_SUPPORTED_LANGUAGES: SupportedLanguage[] = [
@@ -63,6 +64,7 @@ export const ALL_SUPPORTED_LANGUAGES: SupportedLanguage[] = [
   "css",
   "scss",
   "less",
+  "markdown",
 ];
 
 /** Check if a language ID is supported */
@@ -90,5 +92,7 @@ export function getParserLanguage(langId: SupportedLanguage): string {
     case "scss":
     case "less":
       return "css"; // CSS grammar handles all CSS-like languages
+    case "markdown":
+      return "markdown"; // Special handling - parses code blocks
   }
 }

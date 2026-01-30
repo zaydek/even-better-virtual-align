@@ -314,6 +314,11 @@ export class ParserService {
       return this.parseYamlWithRegex(document, startLine, endLine);
     }
 
+    // Markdown parses code blocks with supported languages
+    if (parserLang === "markdown") {
+      return this.parseMarkdownCodeBlocks(document, startLine, endLine);
+    }
+
     // TSX already mapped correctly by getParserLanguage
     const actualLang = parserLang;
 
@@ -646,6 +651,300 @@ export class ParserService {
     }
 
     return colonPositions;
+  }
+
+  /**
+   * Parses markdown files by extracting and parsing fenced code blocks
+   * with supported language identifiers.
+   */
+  private async parseMarkdownCodeBlocks(
+    document: vscode.TextDocument,
+    startLine: number,
+    endLine: number,
+  ): Promise<AlignmentToken[]> {
+    const text = document.getText();
+    const lines = text.split("\n");
+    const tokens: AlignmentToken[] = [];
+
+    // Map of language aliases to our supported languages
+    const langAliases: Record<string, string> = {
+      ts: "typescript",
+      tsx: "tsx",
+      typescript: "typescript",
+      typescriptreact: "tsx",
+      js: "typescript", // Parse JS with TS parser
+      javascript: "typescript",
+      json: "json",
+      jsonc: "json",
+      yaml: "yaml",
+      yml: "yaml",
+      python: "python",
+      py: "python",
+      css: "css",
+      scss: "css",
+      less: "css",
+    };
+
+    // Find all fenced code blocks
+    const codeBlocks: Array<{
+      lang: string;
+      startLine: number;
+      endLine: number;
+      content: string;
+    }> = [];
+
+    let inBlock = false;
+    let blockLang = "";
+    let blockStartLine = 0;
+    let blockContent: string[] = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmed = line.trim();
+
+      if (!inBlock && trimmed.startsWith("```")) {
+        // Start of code block
+        const langMatch = trimmed.match(/^```(\w+)/);
+        if (langMatch) {
+          const lang = langMatch[1].toLowerCase();
+          if (langAliases[lang]) {
+            inBlock = true;
+            blockLang = langAliases[lang];
+            blockStartLine = i + 1; // Content starts on next line
+            blockContent = [];
+          }
+        }
+      } else if (inBlock && trimmed === "```") {
+        // End of code block
+        if (blockContent.length > 0) {
+          codeBlocks.push({
+            lang: blockLang,
+            startLine: blockStartLine,
+            endLine: i - 1,
+            content: blockContent.join("\n"),
+          });
+        }
+        inBlock = false;
+        blockLang = "";
+        blockContent = [];
+      } else if (inBlock) {
+        blockContent.push(line);
+      }
+    }
+
+    // Parse each code block with its appropriate parser
+    for (const block of codeBlocks) {
+      // Skip blocks outside the visible range
+      if (block.endLine < startLine || block.startLine > endLine) {
+        continue;
+      }
+
+      const blockTokens = await this.parseCodeBlockContent(
+        block.content,
+        block.lang,
+        block.startLine,
+      );
+
+      tokens.push(...blockTokens);
+    }
+
+    return tokens;
+  }
+
+  /**
+   * Parses the content of a code block with the appropriate language parser.
+   * Returns tokens with line numbers adjusted to the document.
+   */
+  private async parseCodeBlockContent(
+    content: string,
+    lang: string,
+    lineOffset: number,
+  ): Promise<AlignmentToken[]> {
+    const tokens: AlignmentToken[] = [];
+
+    // Use the appropriate parser based on language
+    if (lang === "json") {
+      // Parse JSON with regex
+      const lines = content.split("\n");
+      const tokenCountByLine: Map<number, number> = new Map();
+
+      for (let i = 0; i < lines.length; i++) {
+        const lineText = lines[i];
+        const docLine = lineOffset + i;
+        const colonPositions = this.findJsonColons(lineText);
+        const indent = this.getIndentLevel(lineText);
+
+        for (const colonPos of colonPositions) {
+          const tokenIndex = tokenCountByLine.get(docLine) ?? 0;
+          tokenCountByLine.set(docLine, tokenIndex + 1);
+
+          tokens.push({
+            line: docLine,
+            column: colonPos,
+            text: ":",
+            type: ":",
+            indent,
+            parentType: "pair",
+            tokenIndex,
+          });
+        }
+      }
+    } else if (lang === "yaml") {
+      // Parse YAML with regex
+      const lines = content.split("\n");
+      const tokenCountByLine: Map<number, number> = new Map();
+
+      for (let i = 0; i < lines.length; i++) {
+        const lineText = lines[i];
+        const docLine = lineOffset + i;
+        const colonPositions = this.findYamlColons(lineText);
+        const indent = this.getIndentLevel(lineText);
+
+        // Skip comments and empty lines
+        const trimmed = lineText.trim();
+        if (
+          trimmed.startsWith("#") ||
+          trimmed === "" ||
+          trimmed === "---" ||
+          trimmed === "..."
+        ) {
+          continue;
+        }
+
+        for (const colonPos of colonPositions) {
+          const tokenIndex = tokenCountByLine.get(docLine) ?? 0;
+          tokenCountByLine.set(docLine, tokenIndex + 1);
+
+          tokens.push({
+            line: docLine,
+            column: colonPos,
+            text: ":",
+            type: ":",
+            indent,
+            parentType: "pair",
+            tokenIndex,
+          });
+        }
+      }
+    } else {
+      // Use Tree-sitter for other languages
+      const loaded = await this.loadLanguage(lang);
+      if (!loaded || !this.parser) {
+        return tokens;
+      }
+
+      const language = this.languages.get(lang);
+      const query = this.queries.get(lang);
+
+      if (!language || !query) {
+        return tokens;
+      }
+
+      try {
+        this.parser.setLanguage(language);
+        const tree = this.parser.parse(content);
+
+        if (!tree) {
+          return tokens;
+        }
+
+        const captures = query.captures(tree.rootNode);
+        const lines = content.split("\n");
+
+        interface CaptureData {
+          line: number;
+          column: number;
+          text: string;
+          type: OperatorType;
+          indent: number;
+          parentType: string;
+        }
+        const captureData: CaptureData[] = [];
+
+        for (const capture of captures) {
+          const node = capture.node;
+          const blockLine = node.startPosition.row;
+          const docLine = lineOffset + blockLine;
+
+          if (this.isInsideStringOrComment(node)) {
+            continue;
+          }
+
+          const operatorText = node.text;
+          const operatorType = this.normalizeOperator(operatorText);
+
+          if (!operatorType) {
+            continue;
+          }
+
+          const lineText = lines[blockLine] || "";
+          const indent = this.getIndentLevel(lineText);
+          const parentType = this.getParentType(node);
+
+          captureData.push({
+            line: docLine,
+            column: node.startPosition.column,
+            text: operatorText,
+            type: operatorType,
+            indent,
+            parentType,
+          });
+        }
+
+        // Find inline objects and add comma tokens
+        const colonsByLine = new Map<number, CaptureData[]>();
+        for (const data of captureData) {
+          if (data.type === ":" && data.parentType === "pair") {
+            if (!colonsByLine.has(data.line)) {
+              colonsByLine.set(data.line, []);
+            }
+            colonsByLine.get(data.line)!.push(data);
+          }
+        }
+
+        for (const [docLine, colons] of colonsByLine) {
+          if (colons.length < 2) continue;
+
+          const blockLine = docLine - lineOffset;
+          const lineText = lines[blockLine] || "";
+          const commaPositions = this.findInlineObjectCommas(lineText, colons);
+
+          for (const commaCol of commaPositions) {
+            captureData.push({
+              line: docLine,
+              column: commaCol,
+              text: ",",
+              type: ",",
+              indent: colons[0].indent,
+              parentType: "inline_object",
+            });
+          }
+        }
+
+        // Sort and assign token indices
+        captureData.sort((a, b) => {
+          if (a.line !== b.line) return a.line - b.line;
+          return a.column - b.column;
+        });
+
+        const tokenCountByLine: Map<number, number> = new Map();
+        for (const data of captureData) {
+          const tokenIndex = tokenCountByLine.get(data.line) ?? 0;
+          tokenCountByLine.set(data.line, tokenIndex + 1);
+
+          tokens.push({
+            ...data,
+            tokenIndex,
+          });
+        }
+
+        tree.delete();
+      } catch (error) {
+        console.error("Error parsing code block:", error);
+      }
+    }
+
+    return tokens;
   }
 
   /**

@@ -1,7 +1,7 @@
 {
   "name": "alignment-sanity",
   "displayName": "Alignment Sanity",
-  "description": "Virtual alignment of = : && || and/or in TypeScript, TSX, JSON, YAML, Python, and CSS without modifying files",
+  "description": "Virtual alignment of = : && || and/or in TypeScript, TSX, JSON, YAML, Python, CSS, and Markdown code blocks without modifying files",
   "version": "3.0.0",
   "engines": {
     "vscode": "^1.85.0"
@@ -19,7 +19,8 @@
     "onLanguage:python",
     "onLanguage:css",
     "onLanguage:scss",
-    "onLanguage:less"
+    "onLanguage:less",
+    "onLanguage:markdown"
   ],
   "main": "./out/extension.js",
   "author": {
@@ -65,7 +66,8 @@
             "python": true,
             "css": true,
             "scss": true,
-            "less": true
+            "less": true,
+            "markdown": true
           },
           "description": "Enable or disable alignment for specific languages",
           "additionalProperties": {

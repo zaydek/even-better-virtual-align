@@ -265,6 +265,7 @@ suite("Types Tests", () => {
     assert.strictEqual(isSupportedLanguage("css"), true);
     assert.strictEqual(isSupportedLanguage("scss"), true);
     assert.strictEqual(isSupportedLanguage("less"), true);
+    assert.strictEqual(isSupportedLanguage("markdown"), true);
   });
 
   test("isSupportedLanguage returns false for unsupported languages", () => {
@@ -277,7 +278,7 @@ suite("Types Tests", () => {
 
 /**
  * JSON Colon Finder Tests
- * 
+ *
  * These test cases verify that the state machine correctly identifies
  * structural colons (key-value separators) and ignores colons inside strings.
  */
@@ -443,7 +444,7 @@ suite("JSON Colon Finder Edge Cases", () => {
 
 /**
  * Gofmt-style Alignment Integration Tests
- * 
+ *
  * These test real-world scenarios to ensure the complete pipeline works correctly.
  */
 suite("Gofmt-style Alignment Scenarios", () => {
@@ -454,9 +455,21 @@ suite("Gofmt-style Alignment Scenarios", () => {
     //   description: string;
     // }
     const tokens: AlignmentToken[] = [
-      token(1, 4, ":", ":", { indent: 2, parentType: "property_signature", tokenIndex: 0 }),
-      token(2, 6, ":", ":", { indent: 2, parentType: "property_signature", tokenIndex: 0 }),
-      token(3, 13, ":", ":", { indent: 2, parentType: "property_signature", tokenIndex: 0 }),
+      token(1, 4, ":", ":", {
+        indent: 2,
+        parentType: "property_signature",
+        tokenIndex: 0,
+      }),
+      token(2, 6, ":", ":", {
+        indent: 2,
+        parentType: "property_signature",
+        tokenIndex: 0,
+      }),
+      token(3, 13, ":", ":", {
+        indent: 2,
+        parentType: "property_signature",
+        tokenIndex: 0,
+      }),
     ];
 
     const groups = groupTokens(tokens);
@@ -473,9 +486,21 @@ suite("Gofmt-style Alignment Scenarios", () => {
     // const foo   = 2;
     // const bar   = 3;
     const tokens: AlignmentToken[] = [
-      token(0, 8, "=", "=", { indent: 0, parentType: "variable_declaration", tokenIndex: 0 }),
-      token(1, 10, "=", "=", { indent: 0, parentType: "variable_declaration", tokenIndex: 0 }),
-      token(2, 10, "=", "=", { indent: 0, parentType: "variable_declaration", tokenIndex: 0 }),
+      token(0, 8, "=", "=", {
+        indent: 0,
+        parentType: "variable_declaration",
+        tokenIndex: 0,
+      }),
+      token(1, 10, "=", "=", {
+        indent: 0,
+        parentType: "variable_declaration",
+        tokenIndex: 0,
+      }),
+      token(2, 10, "=", "=", {
+        indent: 0,
+        parentType: "variable_declaration",
+        tokenIndex: 0,
+      }),
     ];
 
     const groups = groupTokens(tokens);
@@ -509,7 +534,11 @@ suite("Gofmt-style Alignment Scenarios", () => {
     //   { line: 0, column: 5 },            <- object property
     // ];
     const tokens: AlignmentToken[] = [
-      token(0, 13, ":", ":", { indent: 0, parentType: "type_annotation", tokenIndex: 0 }),
+      token(0, 13, ":", ":", {
+        indent: 0,
+        parentType: "type_annotation",
+        tokenIndex: 0,
+      }),
       token(1, 8, ":", ":", { indent: 2, parentType: "pair", tokenIndex: 0 }),
     ];
 
@@ -524,7 +553,11 @@ suite("Gofmt-style Alignment Scenarios", () => {
     // const obj = { key: value };
     // These should NOT align because ternary : is a different parent type
     const tokens: AlignmentToken[] = [
-      token(0, 22, ":", ":", { indent: 0, parentType: "ternary_expression", tokenIndex: 0 }),
+      token(0, 22, ":", ":", {
+        indent: 0,
+        parentType: "ternary_expression",
+        tokenIndex: 0,
+      }),
       token(1, 18, ":", ":", { indent: 0, parentType: "pair", tokenIndex: 0 }),
     ];
 
@@ -551,11 +584,19 @@ suite("Inline Object Alignment Tests", () => {
     const tokens: AlignmentToken[] = [
       // Line 0: key: at col 6, comma at col 12, filterName: at col 28
       token(0, 6, ":", ":", { indent: 2, parentType: "pair", tokenIndex: 0 }),
-      token(0, 12, ",", ",", { indent: 2, parentType: "inline_object", tokenIndex: 1 }),
+      token(0, 12, ",", ",", {
+        indent: 2,
+        parentType: "inline_object",
+        tokenIndex: 1,
+      }),
       token(0, 28, ":", ":", { indent: 2, parentType: "pair", tokenIndex: 2 }),
       // Line 1: key: at col 6, comma at col 14, filterName: at col 28
       token(1, 6, ":", ":", { indent: 2, parentType: "pair", tokenIndex: 0 }),
-      token(1, 14, ",", ",", { indent: 2, parentType: "inline_object", tokenIndex: 1 }),
+      token(1, 14, ",", ",", {
+        indent: 2,
+        parentType: "inline_object",
+        tokenIndex: 1,
+      }),
       token(1, 28, ":", ":", { indent: 2, parentType: "pair", tokenIndex: 2 }),
     ];
 
@@ -575,8 +616,16 @@ suite("Inline Object Alignment Tests", () => {
 
   test("comma groups use padAfter like colons", () => {
     const tokens: AlignmentToken[] = [
-      token(0, 10, ",", ",", { indent: 2, parentType: "inline_object", tokenIndex: 0 }),
-      token(1, 15, ",", ",", { indent: 2, parentType: "inline_object", tokenIndex: 0 }),
+      token(0, 10, ",", ",", {
+        indent: 2,
+        parentType: "inline_object",
+        tokenIndex: 0,
+      }),
+      token(1, 15, ",", ",", {
+        indent: 2,
+        parentType: "inline_object",
+        tokenIndex: 0,
+      }),
     ];
 
     const groups = groupTokens(tokens);
@@ -596,15 +645,31 @@ suite("Inline Object Alignment Tests", () => {
     const tokens: AlignmentToken[] = [
       // Line 0
       token(0, 4, ":", ":", { indent: 2, parentType: "pair", tokenIndex: 0 }),
-      token(0, 7, ",", ",", { indent: 2, parentType: "inline_object", tokenIndex: 1 }),
+      token(0, 7, ",", ",", {
+        indent: 2,
+        parentType: "inline_object",
+        tokenIndex: 1,
+      }),
       token(0, 10, ":", ":", { indent: 2, parentType: "pair", tokenIndex: 2 }),
-      token(0, 13, ",", ",", { indent: 2, parentType: "inline_object", tokenIndex: 3 }),
+      token(0, 13, ",", ",", {
+        indent: 2,
+        parentType: "inline_object",
+        tokenIndex: 3,
+      }),
       token(0, 16, ":", ":", { indent: 2, parentType: "pair", tokenIndex: 4 }),
       // Line 1
       token(1, 5, ":", ":", { indent: 2, parentType: "pair", tokenIndex: 0 }),
-      token(1, 8, ",", ",", { indent: 2, parentType: "inline_object", tokenIndex: 1 }),
+      token(1, 8, ",", ",", {
+        indent: 2,
+        parentType: "inline_object",
+        tokenIndex: 1,
+      }),
       token(1, 12, ":", ":", { indent: 2, parentType: "pair", tokenIndex: 2 }),
-      token(1, 15, ",", ",", { indent: 2, parentType: "inline_object", tokenIndex: 3 }),
+      token(1, 15, ",", ",", {
+        indent: 2,
+        parentType: "inline_object",
+        tokenIndex: 3,
+      }),
       token(1, 19, ":", ":", { indent: 2, parentType: "pair", tokenIndex: 4 }),
     ];
 
@@ -628,8 +693,16 @@ suite("Inline Object Alignment Tests", () => {
   test("inline objects don't align across different parent types", () => {
     // Inline object comma should not align with other commas
     const tokens: AlignmentToken[] = [
-      token(0, 10, ",", ",", { indent: 2, parentType: "inline_object", tokenIndex: 0 }),
-      token(1, 10, ",", ",", { indent: 2, parentType: "arguments", tokenIndex: 0 }), // Different parent
+      token(0, 10, ",", ",", {
+        indent: 2,
+        parentType: "inline_object",
+        tokenIndex: 0,
+      }),
+      token(1, 10, ",", ",", {
+        indent: 2,
+        parentType: "arguments",
+        tokenIndex: 0,
+      }), // Different parent
     ];
 
     const groups = groupTokens(tokens);
@@ -653,15 +726,31 @@ suite("Inline Object Alignment Tests", () => {
     const tokens: AlignmentToken[] = [
       // Line 0: "orange560" is longer
       token(0, 6, ":", ":", { indent: 4, parentType: "pair", tokenIndex: 0 }),
-      token(0, 18, ",", ",", { indent: 4, parentType: "inline_object", tokenIndex: 1 }),
+      token(0, 18, ",", ",", {
+        indent: 4,
+        parentType: "inline_object",
+        tokenIndex: 1,
+      }),
       token(0, 30, ":", ":", { indent: 4, parentType: "pair", tokenIndex: 2 }),
-      token(0, 43, ",", ",", { indent: 4, parentType: "inline_object", tokenIndex: 3 }),
+      token(0, 43, ",", ",", {
+        indent: 4,
+        parentType: "inline_object",
+        tokenIndex: 3,
+      }),
       token(0, 57, ":", ":", { indent: 4, parentType: "pair", tokenIndex: 4 }),
       // Line 1: "fam" is shorter - needs padding after comma
       token(1, 6, ":", ":", { indent: 4, parentType: "pair", tokenIndex: 0 }),
-      token(1, 12, ",", ",", { indent: 4, parentType: "inline_object", tokenIndex: 1 }),
+      token(1, 12, ",", ",", {
+        indent: 4,
+        parentType: "inline_object",
+        tokenIndex: 1,
+      }),
       token(1, 30, ":", ":", { indent: 4, parentType: "pair", tokenIndex: 2 }),
-      token(1, 37, ",", ",", { indent: 4, parentType: "inline_object", tokenIndex: 3 }),
+      token(1, 37, ",", ",", {
+        indent: 4,
+        parentType: "inline_object",
+        tokenIndex: 3,
+      }),
       token(1, 57, ":", ":", { indent: 4, parentType: "pair", tokenIndex: 4 }),
     ];
 
@@ -680,7 +769,9 @@ suite("Inline Object Alignment Tests", () => {
     // First comma group (tokenIndex 1): aligns "fam," with "orange560,"
     // Comma at col 18 on line 0, col 12 on line 1
     // Max end column = max(18+1, 12+1) = max(19, 13) = 19
-    const firstCommaGroup = commaGroups.find((g) => g.tokens[0].tokenIndex === 1);
+    const firstCommaGroup = commaGroups.find(
+      (g) => g.tokens[0].tokenIndex === 1,
+    );
     assert.ok(firstCommaGroup);
     assert.strictEqual(firstCommaGroup!.targetColumn, 19);
   });
