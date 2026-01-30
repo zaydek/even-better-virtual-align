@@ -2,7 +2,7 @@
   "name": "alignment-sanity",
   "displayName": "Alignment Sanity",
   "description": "Virtual alignment of = : && || and/or in TypeScript, TSX, JSON, YAML, and Python without modifying files",
-  "version": "2.8.0",
+  "version": "2.9.0",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -43,8 +43,8 @@
     "keybindings": [
       {
         "command": "alignment-sanity.toggle",
-        "key": "alt+cmd+a",
-        "mac": "alt+cmd+a",
+        "key": "shift+cmd+a",
+        "mac": "shift+cmd+a",
         "when": "editorTextFocus"
       }
     ]
