@@ -1,5 +1,5 @@
 /**
- * Alignment Sanity - Virtual code alignment for TypeScript, JSON, and Python.
+ * Even Better Virtual Align - Virtual code alignment for TypeScript, JSON, and Python.
  *
  * Uses Tree-sitter for reliable parsing and VS Code decorations for
  * visual alignment without modifying files.
@@ -27,10 +27,10 @@ let enabled = true;
 function updateStatusBar(): void {
   if (enabled) {
     statusBarItem.text = "$(check) Align";
-    statusBarItem.tooltip = "Alignment Sanity: Enabled (click to disable)";
+    statusBarItem.tooltip = "Even Better Virtual Align: Enabled (click to disable)";
   } else {
     statusBarItem.text = "$(x) Align";
-    statusBarItem.tooltip = "Alignment Sanity: Disabled (click to enable)";
+    statusBarItem.tooltip = "Even Better Virtual Align: Disabled (click to enable)";
   }
 }
 
@@ -49,7 +49,7 @@ export async function activate(
   context: vscode.ExtensionContext,
 ): Promise<void> {
   // Create output channel for logging
-  outputChannel = vscode.window.createOutputChannel("Alignment Sanity");
+  outputChannel = vscode.window.createOutputChannel("Even Better Virtual Align");
   context.subscriptions.push(outputChannel);
 
   // Create status bar item
@@ -57,7 +57,7 @@ export async function activate(
     vscode.StatusBarAlignment.Right,
     100,
   );
-  statusBarItem.command = "alignment-sanity.toggle";
+  statusBarItem.command = "even-better-virtual-align.toggle";
   updateStatusBar();
   statusBarItem.show();
   context.subscriptions.push(statusBarItem);
@@ -75,7 +75,7 @@ export async function activate(
     const errorMsg = error instanceof Error ? error.message : String(error);
     log(`Failed to initialize parser: ${errorMsg}`);
     vscode.window.showErrorMessage(
-      `Alignment Sanity: Failed to initialize. Error: ${errorMsg}`,
+      `Even Better Virtual Align: Failed to initialize. Error: ${errorMsg}`,
     );
     return;
   }
@@ -85,18 +85,18 @@ export async function activate(
 
   // Register toggle command
   const toggleCommand = vscode.commands.registerCommand(
-    "alignment-sanity.toggle",
+    "even-better-virtual-align.toggle",
     () => {
       enabled = !enabled;
       updateStatusBar();
       log(`Toggled: ${enabled ? "enabled" : "disabled"}`);
       if (enabled) {
-        vscode.window.showInformationMessage("Alignment Sanity: Enabled");
+        vscode.window.showInformationMessage("Even Better Virtual Align: Enabled");
         if (vscode.window.activeTextEditor) {
           debouncedUpdate(vscode.window.activeTextEditor);
         }
       } else {
-        vscode.window.showInformationMessage("Alignment Sanity: Disabled");
+        vscode.window.showInformationMessage("Even Better Virtual Align: Disabled");
         decorationManager.clearAll();
       }
     },
@@ -105,13 +105,13 @@ export async function activate(
 
   // Register enable command
   const enableCommand = vscode.commands.registerCommand(
-    "alignment-sanity.enable",
+    "even-better-virtual-align.enable",
     () => {
       if (!enabled) {
         enabled = true;
         updateStatusBar();
         log("Enabled");
-        vscode.window.showInformationMessage("Alignment Sanity: Enabled");
+        vscode.window.showInformationMessage("Even Better Virtual Align: Enabled");
         if (vscode.window.activeTextEditor) {
           debouncedUpdate(vscode.window.activeTextEditor);
         }
@@ -122,13 +122,13 @@ export async function activate(
 
   // Register disable command
   const disableCommand = vscode.commands.registerCommand(
-    "alignment-sanity.disable",
+    "even-better-virtual-align.disable",
     () => {
       if (enabled) {
         enabled = false;
         updateStatusBar();
         log("Disabled");
-        vscode.window.showInformationMessage("Alignment Sanity: Disabled");
+        vscode.window.showInformationMessage("Even Better Virtual Align: Disabled");
         decorationManager.clearAll();
       }
     },
@@ -182,7 +182,7 @@ async function updateEditor(editor: vscode.TextEditor): Promise<void> {
   }
 
   // Check if language is enabled in settings
-  const config = vscode.workspace.getConfiguration("alignmentSanity");
+  const config = vscode.workspace.getConfiguration("evenBetterVirtualAlign");
   const enabledLanguages = config.get<Record<string, boolean>>("enabledLanguages", {});
   if (enabledLanguages[langId] === false) {
     decorationManager.clear(editor);

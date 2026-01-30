@@ -1,5 +1,5 @@
 /**
- * Tests for Alignment Sanity extension.
+ * Tests for Even Better Virtual Align extension.
  */
 
 import * as assert from "assert";

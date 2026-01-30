@@ -230,7 +230,7 @@ export class ParserService {
         "wasm",
       );
     }
-    console.log("Alignment Sanity: WASM directory:", this.wasmDir);
+    console.log("Even Better Virtual Align: WASM directory:", this.wasmDir);
   }
 
   /**
@@ -243,7 +243,7 @@ export class ParserService {
     }
 
     try {
-      console.log("Alignment Sanity: Initializing Tree-sitter...");
+      console.log("Even Better Virtual Align: Initializing Tree-sitter...");
 
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const treeSitter = require("@vscode/tree-sitter-wasm");
@@ -255,17 +255,17 @@ export class ParserService {
       await this.ParserClass.init({
         locateFile: (file: string) => {
           const fullPath = path.join(this.wasmDir, file);
-          console.log("Alignment Sanity: Loading WASM file:", fullPath);
+          console.log("Even Better Virtual Align: Loading WASM file:", fullPath);
           return fullPath;
         },
       });
 
       this.parser = new this.ParserClass();
       this.initialized = true;
-      console.log("Alignment Sanity: Tree-sitter initialized successfully");
+      console.log("Even Better Virtual Align: Tree-sitter initialized successfully");
     } catch (error) {
       console.error(
-        "Alignment Sanity: Failed to initialize Tree-sitter:",
+        "Even Better Virtual Align: Failed to initialize Tree-sitter:",
         error,
       );
       throw error;

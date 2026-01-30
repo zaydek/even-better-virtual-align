@@ -1,4 +1,6 @@
-# Alignment Sanity
+# Even Better Virtual Align
+
+> **even-better-virtual-align** is based on [virtual-better-align](https://github.com/hborchardt/virtual-better-align), which is based on [better-align](https://github.com/chouzz/vscode-better-align). Rebuilt from scratch using Tree-sitter for reliable, AST-based parsing.
 
 This VS Code/Cursor extension attempts to solve the "glanceability" problem: how do you read not just a thousand lines of code per day, but tens of thousands?
 
@@ -26,7 +28,7 @@ timeout = 30                      timeout = 30
 
 ## The Solution
 
-**Alignment Sanity** renders alignment **visually** without touching your files. Your code looks perfectly aligned in the editor, but the file on disk stays exactly as your formatter left it.
+**Even Better Virtual Align** renders alignment **visually** without touching your files. Your code looks perfectly aligned in the editor, but the file on disk stays exactly as your formatter left it.
 
 | What You See (Editor) | What Is Saved (Disk) |
 | :-------------------- | :------------------- |
@@ -182,8 +184,8 @@ $spacing-unit:  0.25rem;
 | Action      | Command / Shortcut                               |
 | :---------- | :----------------------------------------------- |
 | **Toggle**  | `Cmd+Shift+A` (Mac) / `Ctrl+Shift+A` (Win/Linux) |
-| **Enable**  | Command Palette → `Alignment Sanity: Enable`     |
-| **Disable** | Command Palette → `Alignment Sanity: Disable`    |
+| **Enable**  | Command Palette → `Even Better Virtual Align: Enable`     |
+| **Disable** | Command Palette → `Even Better Virtual Align: Disable`    |
 
 **Status Bar:** Look for the "✓ Align" / "✗ Align" indicator in the bottom right.
 
@@ -195,7 +197,7 @@ You can enable or disable alignment for specific languages in your `settings.jso
 
 ```json
 {
-  "alignmentSanity.enabledLanguages": {
+  "evenBetterVirtualAlign.enabledLanguages": {
     "typescript": true,
     "typescriptreact": true,
     "json": true,
@@ -217,15 +219,15 @@ Set any language to `false` to disable alignment for that language.
 
 ### From VSIX (Releases)
 
-1. Download the `.vsix` file from the [Releases page](https://github.com/zaydek/alignment-sanity/releases).
+1. Download the `.vsix` file from the [Releases page](https://github.com/zaydek/even-better-virtual-align/releases).
 2. Run the install command:
 
 ```bash
 # For VS Code
-code --install-extension alignment-sanity-*.vsix
+code --install-extension even-better-virtual-align-*.vsix
 
 # For Cursor
-cursor --install-extension alignment-sanity-*.vsix
+cursor --install-extension even-better-virtual-align-*.vsix
 ```
 
 ---

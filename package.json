@@ -1,6 +1,6 @@
 {
-  "name": "alignment-sanity",
-  "displayName": "Alignment Sanity",
+  "name": "even-better-virtual-align",
+  "displayName": "Even Better Virtual Align",
   "description": "Virtual alignment of = : && || and/or in TypeScript, TSX, JSON, YAML, Python, CSS, and Markdown code blocks without modifying files",
   "version": "3.0.0",
   "engines": {
@@ -27,35 +27,35 @@
     "name": "zaydek"
   },
   "publisher": "zaydek",
-  "repository": "github:zaydek/alignment-sanity",
+  "repository": "github:zaydek/even-better-virtual-align",
   "license": "MIT",
   "contributes": {
     "commands": [
       {
-        "command": "alignment-sanity.toggle",
-        "title": "Alignment Sanity: Toggle"
+        "command": "even-better-virtual-align.toggle",
+        "title": "Even Better Virtual Align: Toggle"
       },
       {
-        "command": "alignment-sanity.enable",
-        "title": "Alignment Sanity: Enable"
+        "command": "even-better-virtual-align.enable",
+        "title": "Even Better Virtual Align: Enable"
       },
       {
-        "command": "alignment-sanity.disable",
-        "title": "Alignment Sanity: Disable"
+        "command": "even-better-virtual-align.disable",
+        "title": "Even Better Virtual Align: Disable"
       }
     ],
     "keybindings": [
       {
-        "command": "alignment-sanity.toggle",
+        "command": "even-better-virtual-align.toggle",
         "key": "shift+cmd+a",
         "mac": "shift+cmd+a",
         "when": "editorTextFocus"
       }
     ],
     "configuration": {
-      "title": "Alignment Sanity",
-      "properties": {
-        "alignmentSanity.enabledLanguages": {
+"title": "Even Better Virtual Align",
+        "properties": {
+          "evenBetterVirtualAlign.enabledLanguages": {
           "type": "object",
           "default": {
             "typescript": true,
