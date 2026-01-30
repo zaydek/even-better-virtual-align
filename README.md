@@ -1,6 +1,6 @@
 # Alignment Sanity
 
-**Read tens of thousands of lines of code. Not one line at a time.**
+This VS Code/Cursor extension attempts to solve the "glanceability" problem: how do you read not just a thousand lines of code per day, but tens of thousands?
 
 [![VS Code](https://img.shields.io/badge/VS%20Code-Compatible-blue?logo=visualstudiocode)](https://marketplace.visualstudio.com/)
 [![Cursor](https://img.shields.io/badge/Cursor-Compatible-purple)](https://cursor.sh/)
@@ -8,11 +8,7 @@
 
 ---
 
-## The Glanceability Problem
-
-Professional developers don't read code line by line—they *scan* it. When you're reviewing PRs, debugging production issues, or onboarding onto a new codebase, you need to process tens of thousands of lines per day. The difference between readable code and scannable code is the difference between understanding a system in minutes versus hours.
-
-**Vertical alignment is one of the most powerful tools for glanceability.** It turns walls of text into structured data that your eyes can parse instantly:
+Vertical alignment makes code scannable instead of just readable:
 
 ```python
 # Hard to scan                    # Easy to scan
@@ -35,10 +31,10 @@ But there's a catch: inserting actual alignment spaces into your files causes pr
 **Alignment Sanity** renders alignment **visually** without touching your files. Your code looks perfectly aligned in the editor, but the file on disk stays exactly as your formatter left it.
 
 | What You See (Editor) | What Is Saved (Disk) |
-| :--- | :--- |
-| `name:    "app"` | `name: "app"` |
-| `version: "1.0"` | `version: "1.0"` |
-| `debug:   true` | `debug: true` |
+| :-------------------- | :------------------- |
+| `name:    "app"`      | `name: "app"`        |
+| `version: "1.0"`      | `version: "1.0"`     |
+| `debug:   true`       | `debug: true`        |
 
 **Your git diff:** Clean. Zero alignment noise. Just the actual changes.
 
@@ -50,8 +46,8 @@ But there's a catch: inserting actual alignment spaces into your files causes pr
 - **Tree-sitter Powered:** Uses robust AST parsing instead of fragile regex. It understands context, scope, and structure.
 - **Smart Grouping:** Only aligns related code (same indentation, same AST context, consecutive lines).
 - **Go-Style Rules:**
-  - **Colons (`:`)**: Attached to the key; padding added *after* to align values.
-  - **Operators (`=`, `&&`, `||`)**: Padding added *before* to align the operators.
+  - **Colons (`:`)**: Attached to the key; padding added _after_ to align values.
+  - **Operators (`=`, `&&`, `||`)**: Padding added _before_ to align the operators.
 - **Multi-Language:** Native support for TypeScript, TSX, JSON, YAML, Python, CSS, SCSS, and Less.
 
 ---
@@ -60,46 +56,50 @@ But there's a catch: inserting actual alignment spaces into your files causes pr
 
 ### Data & Configuration
 
-*Aligns keys at the same indentation level. Nested blocks form separate alignment groups.*
+_Aligns keys at the same indentation level. Nested blocks form separate alignment groups._
 
 **Package Configuration** (JSON)
+
 ```json
 {
-  "name":        "enterprise-dashboard",
-  "version":     "2.4.0",
+  "name": "enterprise-dashboard",
+  "version": "2.4.0",
   "description": "Real-time analytics platform",
-  "main":        "dist/server.js",
-  "license":     "MIT"
+  "main": "dist/server.js",
+  "license": "MIT"
 }
 ```
 
 **Nested Structures** (YAML)
+
 ```yaml
 # Each indentation level aligns independently
 spec:
   replicas: 3
   strategy: RollingUpdate
   selector:
-    app:  backend    # Nested group - aligns separately
+    app: backend # Nested group - aligns separately
     tier: production
 ```
 
 **Type Definitions** (TypeScript)
+
 ```typescript
 interface UserProfile {
-  id:          string;
-  email:       string;
+  id: string;
+  email: string;
   displayName: string;
-  avatarUrl:   string | null;
-  isVerified:  boolean;
+  avatarUrl: string | null;
+  isVerified: boolean;
 }
 ```
 
 ### Logic & Conditions
 
-*Clarify complex logic by aligning operators. Padding added **before** `=`, `&&`, `||`, etc.*
+_Clarify complex logic by aligning operators. Padding added **before** `=`, `&&`, `||`, etc._
 
 **Environment Setup** (Python)
+
 ```python
 DEBUG        = os.getenv("DEBUG", "false") == "true"
 SECRET_KEY   = os.getenv("SECRET_KEY", "dev-secret")
@@ -109,78 +109,80 @@ API_TIMEOUT  = int(os.getenv("API_TIMEOUT", "30"))
 ```
 
 **Conditional Classes** (TSX / React)
+
 ```tsx
 const buttonClasses = clsx(
   "px-4 py-2 rounded transition-all",
-  isPrimary    && "bg-blue-600 text-white hover:bg-blue-700",
-  isSecondary  && "bg-gray-100 text-gray-900 hover:bg-gray-200",
-  isLoading    && "opacity-75 cursor-wait",
-  isDisabled   && "opacity-50 pointer-events-none"
+  isPrimary && "bg-blue-600 text-white hover:bg-blue-700",
+  isSecondary && "bg-gray-100 text-gray-900 hover:bg-gray-200",
+  isLoading && "opacity-75 cursor-wait",
+  isDisabled && "opacity-50 pointer-events-none",
 );
 ```
 
 **Guard Clauses** (TypeScript)
+
 ```typescript
 const canSubmit =
-  isFormValid              &&
-  !isSubmitting            &&
-  hasAgreedToTerms         &&
-  (hasCredit || isFreeTier);
+  isFormValid && !isSubmitting && hasAgreedToTerms && (hasCredit || isFreeTier);
 ```
 
 ### Styling & Theming
 
-*Create clean, readable style definitions and token maps.*
+_Create clean, readable style definitions and token maps._
 
 **Component Styles** (CSS)
+
 ```css
 .card {
-  position:       relative;
-  display:        flex;
+  position: relative;
+  display: flex;
   flex-direction: column;
-  padding:        1.5rem;
-  border-radius:  0.5rem;
+  padding: 1.5rem;
+  border-radius: 0.5rem;
 }
 ```
 
 **Design Tokens** (SCSS)
+
 ```scss
 $color-primary: #3b82f6;
-$color-danger:  #ef4444;
+$color-danger: #ef4444;
 $color-success: #22c55e;
-$spacing-unit:  0.25rem;
+$spacing-unit: 0.25rem;
 ```
 
 **Responsive Breakpoints** (Less)
+
 ```less
-@screen-sm:       640px;
-@screen-md:       768px;
-@screen-lg:       1024px;
-@screen-xl:       1280px;
-@container-max:   1440px;
+@screen-sm: 640px;
+@screen-md: 768px;
+@screen-lg: 1024px;
+@screen-xl: 1280px;
+@container-max: 1440px;
 ```
 
 ---
 
 ## Supported Languages & Operators
 
-| Language | Extension | Aligned Operators |
-| :--- | :--- | :--- |
-| **TypeScript / TSX** | `.ts`, `.tsx` | `=`, `:`, `&&`, `\|\|` |
-| **JSON / JSONC** | `.json`, `.jsonc` | `:` |
-| **YAML** | `.yaml`, `.yml` | `:` |
-| **Python** | `.py` | `=`, `:`, `and`, `or` |
-| **CSS / SCSS / Less** | `.css`, `.scss`, `.less` | `:` |
+| Language              | Extension                | Aligned Operators      |
+| :-------------------- | :----------------------- | :--------------------- |
+| **TypeScript / TSX**  | `.ts`, `.tsx`            | `=`, `:`, `&&`, `\|\|` |
+| **JSON / JSONC**      | `.json`, `.jsonc`        | `:`                    |
+| **YAML**              | `.yaml`, `.yml`          | `:`                    |
+| **Python**            | `.py`                    | `=`, `:`, `and`, `or`  |
+| **CSS / SCSS / Less** | `.css`, `.scss`, `.less` | `:`                    |
 
 ---
 
 ## Usage
 
-| Action | Command / Shortcut |
-| :--- | :--- |
-| **Toggle** | `Cmd+Shift+A` (Mac) / `Ctrl+Shift+A` (Win/Linux) |
-| **Enable** | Command Palette → `Alignment Sanity: Enable` |
-| **Disable** | Command Palette → `Alignment Sanity: Disable` |
+| Action      | Command / Shortcut                               |
+| :---------- | :----------------------------------------------- |
+| **Toggle**  | `Cmd+Shift+A` (Mac) / `Ctrl+Shift+A` (Win/Linux) |
+| **Enable**  | Command Palette → `Alignment Sanity: Enable`     |
+| **Disable** | Command Palette → `Alignment Sanity: Disable`    |
 
 **Status Bar:** Look for the "✓ Align" / "✗ Align" indicator in the bottom right.
 
