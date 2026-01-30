@@ -22,15 +22,28 @@ export class DecorationManager {
 
   /**
    * Updates decorations for an editor based on alignment groups.
+   *
+   * Two-pass algorithm to handle accumulated shift:
+   * 1. First pass: Calculate padding for non-comment operators, track per-line shift
+   * 2. Second pass: Calculate comment padding accounting for accumulated shift
    */
   update(editor: vscode.TextEditor, groups: AlignmentGroup[]): void {
     // Clear existing decorations for this editor
     this.clear(editor);
 
+    // Separate comment groups from regular groups
+    const commentGroups = groups.filter((g) => g.tokens[0]?.type === "//");
+    const regularGroups = groups.filter((g) => g.tokens[0]?.type !== "//");
+
+    // Track accumulated "padAfter" shift per line
+    // This is the total visual shift caused by padding inserted AFTER operators
+    const lineShift = new Map<number, number>();
+
     // Batch ranges by width for efficient decoration application
     const rangesByWidth = new Map<number, vscode.Range[]>();
 
-    for (const group of groups) {
+    // --- PASS 1: Process regular operators ---
+    for (const group of regularGroups) {
       for (const token of group.tokens) {
         let spacesNeeded: number;
         let pos: vscode.Position;
@@ -40,6 +53,12 @@ export class DecorationManager {
           const operatorEndColumn = token.column + token.text.length;
           spacesNeeded = group.targetColumn - operatorEndColumn;
           pos = new vscode.Position(token.line, operatorEndColumn);
+
+          // Track this shift for comment alignment
+          if (spacesNeeded > 0) {
+            const currentShift = lineShift.get(token.line) ?? 0;
+            lineShift.set(token.line, currentShift + spacesNeeded);
+          }
         } else {
           // For `=`, `&&`, `||` - pad BEFORE operator to align operators
           spacesNeeded = group.targetColumn - token.column;
@@ -49,6 +68,35 @@ export class DecorationManager {
         if (spacesNeeded <= 0 || spacesNeeded > MAX_CACHED_WIDTH) {
           continue;
         }
+
+        if (!rangesByWidth.has(spacesNeeded)) {
+          rangesByWidth.set(spacesNeeded, []);
+        }
+
+        rangesByWidth.get(spacesNeeded)!.push(new vscode.Range(pos, pos));
+      }
+    }
+
+    // --- PASS 2: Process comment groups with shift adjustment ---
+    for (const group of commentGroups) {
+      // Recalculate target column using VISUAL positions
+      // Visual position = original column + accumulated shift
+      const visualColumns = group.tokens.map((t) => {
+        const shift = lineShift.get(t.line) ?? 0;
+        return t.column + shift;
+      });
+      const targetVisualColumn = Math.max(...visualColumns);
+
+      for (const token of group.tokens) {
+        const shift = lineShift.get(token.line) ?? 0;
+        const currentVisualColumn = token.column + shift;
+        const spacesNeeded = targetVisualColumn - currentVisualColumn;
+
+        if (spacesNeeded <= 0 || spacesNeeded > MAX_CACHED_WIDTH) {
+          continue;
+        }
+
+        const pos = new vscode.Position(token.line, token.column);
 
         if (!rangesByWidth.has(spacesNeeded)) {
           rangesByWidth.set(spacesNeeded, []);
