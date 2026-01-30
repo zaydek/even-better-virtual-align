@@ -21,7 +21,21 @@ const VISIBLE_RANGE_BUFFER = 20;
 let parserService: ParserService;
 let decorationManager: DecorationManager;
 let outputChannel: vscode.OutputChannel;
+let statusBarItem: vscode.StatusBarItem;
 let enabled = true;
+
+/**
+ * Updates the status bar item to reflect current state.
+ */
+function updateStatusBar(): void {
+  if (enabled) {
+    statusBarItem.text = "$(check) Align";
+    statusBarItem.tooltip = "Alignment Sanity: Enabled (click to disable)";
+  } else {
+    statusBarItem.text = "$(x) Align";
+    statusBarItem.tooltip = "Alignment Sanity: Disabled (click to enable)";
+  }
+}
 
 /**
  * Logs a message to the output channel.
@@ -40,7 +54,17 @@ export async function activate(
   // Create output channel for logging
   outputChannel = vscode.window.createOutputChannel("Alignment Sanity");
   context.subscriptions.push(outputChannel);
-  
+
+  // Create status bar item
+  statusBarItem = vscode.window.createStatusBarItem(
+    vscode.StatusBarAlignment.Right,
+    100,
+  );
+  statusBarItem.command = "alignment-sanity.toggle";
+  updateStatusBar();
+  statusBarItem.show();
+  context.subscriptions.push(statusBarItem);
+
   log("Activating...");
 
   // Initialize services
@@ -67,6 +91,8 @@ export async function activate(
     "alignment-sanity.toggle",
     () => {
       enabled = !enabled;
+      updateStatusBar();
+      log(`Toggled: ${enabled ? "enabled" : "disabled"}`);
       if (enabled) {
         vscode.window.showInformationMessage("Alignment Sanity: Enabled");
         if (vscode.window.activeTextEditor) {

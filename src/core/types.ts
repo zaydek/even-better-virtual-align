@@ -47,9 +47,14 @@ export type SupportedLanguage =
 export function isSupportedLanguage(
   langId: string,
 ): langId is SupportedLanguage {
-  return ["typescript", "typescriptreact", "json", "jsonc", "yaml", "python"].includes(
-    langId,
-  );
+  return [
+    "typescript",
+    "typescriptreact",
+    "json",
+    "jsonc",
+    "yaml",
+    "python",
+  ].includes(langId);
 }
 
 /** Map VS Code language IDs to parser language keys */

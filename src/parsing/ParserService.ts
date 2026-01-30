@@ -500,7 +500,12 @@ export class ParserService {
 
       // Skip comments and empty lines
       const trimmed = lineText.trim();
-      if (trimmed.startsWith("#") || trimmed === "" || trimmed === "---" || trimmed === "...") {
+      if (
+        trimmed.startsWith("#") ||
+        trimmed === "" ||
+        trimmed === "---" ||
+        trimmed === "..."
+      ) {
         continue;
       }
 
@@ -554,7 +559,11 @@ export class ParserService {
       if (char === ":" && !inSingleQuote && !inDoubleQuote) {
         // Check it's not a URL (http://, https://, etc.)
         const before = line.substring(0, i);
-        if (before.endsWith("http") || before.endsWith("https") || before.endsWith("ftp")) {
+        if (
+          before.endsWith("http") ||
+          before.endsWith("https") ||
+          before.endsWith("ftp")
+        ) {
           continue;
         }
 
