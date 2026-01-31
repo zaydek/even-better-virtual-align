@@ -405,13 +405,13 @@ export class ParserService {
           continue;
         }
 
-        // Skip if inside a string or comment
-        if (this.isInsideStringOrComment(node)) {
-          continue;
-        }
-
         const operatorText = node.text;
         const operatorType = this.normalizeOperator(operatorText);
+
+        // Skip if inside a string or comment (but NOT if we're capturing the comment itself)
+        if (operatorType !== "//" && this.isInsideStringOrComment(node)) {
+          continue;
+        }
 
         if (!operatorType) {
           continue;

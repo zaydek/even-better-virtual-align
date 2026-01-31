@@ -37,15 +37,18 @@ export function groupTokens(tokens: AlignmentToken[]): AlignmentGroup[] {
       key = `${token.type}|${token.indent}|${token.parentType}|${token.tokenIndex}|${token.scopeId}`;
     } else if (
       token.operatorCountOnLine > 1 &&
-      token.parentType !== "function_arguments"
+      token.parentType !== "function_arguments" &&
+      token.parentType !== "trailing_comment" // Don't isolate trailing comments
     ) {
       // Inline object (multiple operators on one line): isolate by line
       // Each inline object is a separate type, don't align across them
-      // Exception: function_arguments should align across lines (that's the whole point)
+      // Exceptions:
+      //   - function_arguments: should align across lines (that's the whole point)
+      //   - trailing_comment: should align across lines regardless of what else is on the line
       key = `${token.type}|${token.indent}|${token.parentType}|${token.tokenIndex}|line_${token.line}`;
     } else {
       // Multi-line block (one operator per line): use scopeId for shared alignment
-      // Also applies to function_arguments regardless of operatorCountOnLine
+      // Also applies to function_arguments and trailing_comment regardless of operatorCountOnLine
       key = `${token.type}|${token.indent}|${token.parentType}|${token.tokenIndex}|${token.scopeId}`;
     }
     if (!buckets.has(key)) {

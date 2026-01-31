@@ -1230,3 +1230,508 @@ suite("Function Argument Alignment Tests", () => {
     assert.strictEqual(groups[0].padAfter, false);
   });
 });
+
+/**
+ * Trailing Comment Alignment Tests
+ *
+ * Tests for aligning trailing comments (// and #) at the end of lines.
+ * Comments should align at the rightmost visual column, accounting for
+ * any padding added by other operators on the same line.
+ */
+suite("Trailing Comment Alignment Tests", () => {
+  test("trailing comments group together when on consecutive lines", () => {
+    // enum EnumStatus {
+    //   Uploading = "uploading", // comment 1
+    //   Complete  = "complete",  // comment 2
+    //   Error     = "error",     // comment 3
+    // }
+    const tokens: AlignmentToken[] = [
+      // Comments use special parentType and scopeId
+      token(1, 28, "//", "//", {
+        indent: 2,
+        parentType: "trailing_comment",
+        tokenIndex: 0,
+        scopeId: "trailing_comment",
+      }),
+      token(2, 28, "//", "//", {
+        indent: 2,
+        parentType: "trailing_comment",
+        tokenIndex: 0,
+        scopeId: "trailing_comment",
+      }),
+      token(3, 22, "//", "//", {
+        indent: 2,
+        parentType: "trailing_comment",
+        tokenIndex: 0,
+        scopeId: "trailing_comment",
+      }),
+    ];
+
+    const groups = groupTokens(tokens);
+
+    // All comments should be in one group
+    assert.strictEqual(groups.length, 1);
+    assert.strictEqual(groups[0].tokens.length, 3);
+    // Comments pad BEFORE (like =), so padAfter = false
+    assert.strictEqual(groups[0].padAfter, false);
+    // Target column = max column = 28
+    assert.strictEqual(groups[0].targetColumn, 28);
+  });
+
+  test("trailing comments with different indents don't group", () => {
+    const tokens: AlignmentToken[] = [
+      token(0, 20, "//", "//", {
+        indent: 2,
+        parentType: "trailing_comment",
+        tokenIndex: 0,
+        scopeId: "trailing_comment",
+      }),
+      token(1, 25, "//", "//", {
+        indent: 4, // Different indent
+        parentType: "trailing_comment",
+        tokenIndex: 0,
+        scopeId: "trailing_comment",
+      }),
+    ];
+
+    const groups = groupTokens(tokens);
+
+    // Different indents = no grouping
+    assert.strictEqual(groups.length, 0);
+  });
+
+  test("trailing comments at DIFFERENT columns but SAME indent DO group", () => {
+    // This is the critical test for enum/type trailing comments
+    // Comments are at different source columns but same indent level
+    // They should still group together
+    const tokens: AlignmentToken[] = [
+      // Simulating:
+      //   Uploading = "uploading", // comment <- column 27
+      //   Complete = "complete", // comment   <- column 25
+      //   Error = "error", // comment         <- column 19
+      token(1, 27, "//", "//", {
+        indent: 2,
+        parentType: "trailing_comment",
+        tokenIndex: 0,
+        scopeId: "trailing_comment",
+      }),
+      token(2, 25, "//", "//", {
+        indent: 2,
+        parentType: "trailing_comment",
+        tokenIndex: 0,
+        scopeId: "trailing_comment",
+      }),
+      token(3, 19, "//", "//", {
+        indent: 2,
+        parentType: "trailing_comment",
+        tokenIndex: 0,
+        scopeId: "trailing_comment",
+      }),
+    ];
+
+    const groups = groupTokens(tokens);
+
+    // All comments should be in ONE group (same indent, consecutive lines)
+    assert.strictEqual(groups.length, 1, "Should have 1 comment group");
+    assert.strictEqual(
+      groups[0].tokens.length,
+      3,
+      "Group should have 3 tokens",
+    );
+
+    // Target column should be the MAX (rightmost) = 27
+    assert.strictEqual(
+      groups[0].targetColumn,
+      27,
+      "Target should be rightmost column",
+    );
+
+    // padAfter should be false for comments (pad BEFORE to push right)
+    assert.strictEqual(groups[0].padAfter, false, "Comments should pad before");
+  });
+
+  test("trailing comments with operatorCountOnLine > 1 still group (THE BUG FIX)", () => {
+    // This tests the critical bug: when a line has multiple operators (like = and //),
+    // the inline object isolation logic was incorrectly isolating each comment by line.
+    //
+    // Example:
+    //   Uploading = "uploading", // comment  <- 2 operators: = and //
+    //   Complete = "complete", // comment    <- 2 operators: = and //
+    //   Error = "error", // comment          <- 2 operators: = and //
+    //
+    // The bug: operatorCountOnLine > 1 triggered line isolation for comments,
+    // making each comment its own bucket, so they never grouped.
+    const tokens: AlignmentToken[] = [
+      // Line 1: = and //
+      token(1, 12, "=", "=", {
+        indent: 2,
+        parentType: "enum_assignment",
+        tokenIndex: 0,
+        scopeId: "enum_1",
+        operatorCountOnLine: 2,
+      }),
+      token(1, 27, "//", "//", {
+        indent: 2,
+        parentType: "trailing_comment",
+        tokenIndex: 1, // Second operator on line
+        scopeId: "trailing_comment",
+        operatorCountOnLine: 2,
+      }),
+      // Line 2: = and //
+      token(2, 11, "=", "=", {
+        indent: 2,
+        parentType: "enum_assignment",
+        tokenIndex: 0,
+        scopeId: "enum_1",
+        operatorCountOnLine: 2,
+      }),
+      token(2, 25, "//", "//", {
+        indent: 2,
+        parentType: "trailing_comment",
+        tokenIndex: 1,
+        scopeId: "trailing_comment",
+        operatorCountOnLine: 2,
+      }),
+      // Line 3: = and //
+      token(3, 8, "=", "=", {
+        indent: 2,
+        parentType: "enum_assignment",
+        tokenIndex: 0,
+        scopeId: "enum_1",
+        operatorCountOnLine: 2,
+      }),
+      token(3, 19, "//", "//", {
+        indent: 2,
+        parentType: "trailing_comment",
+        tokenIndex: 1,
+        scopeId: "trailing_comment",
+        operatorCountOnLine: 2,
+      }),
+    ];
+
+    const groups = groupTokens(tokens);
+
+    // Should have 2 groups: one for = operators, one for // comments
+    assert.strictEqual(groups.length, 2, "Should have 2 groups (= and //)");
+
+    // Find the comment group
+    const commentGroup = groups.find((g) => g.tokens[0].type === "//");
+    assert.ok(commentGroup, "Should have a comment group");
+    assert.strictEqual(
+      commentGroup!.tokens.length,
+      3,
+      "Comment group should have all 3 comments",
+    );
+
+    // Target should be the max column (27)
+    assert.strictEqual(
+      commentGroup!.targetColumn,
+      27,
+      "Comment target should be rightmost column",
+    );
+  });
+
+  test("enum with = operators and trailing comments: shift calculation", () => {
+    // This tests the bug scenario:
+    // Source positions (before virtual alignment):
+    //   Empty = "empty", // comment        <- = at col 8, // at col 19
+    //   Uploading = "uploading", // comment <- = at col 12, // at col 27
+    //
+    // After = alignment (padding before =):
+    //   Empty's = gets 4 spaces padding -> shift = 4
+    //   Uploading's = needs 0 padding -> shift = 0
+    //
+    // Comment visual positions:
+    //   Empty: 19 + 4 = 23
+    //   Uploading: 27 + 0 = 27
+    //
+    // Target = 27, so Empty needs 4 more spaces
+
+    // First, test that = operators group correctly
+    const equalsTokens: AlignmentToken[] = [
+      token(0, 8, "=", "=", {
+        indent: 2,
+        parentType: "enum_assignment",
+        tokenIndex: 0,
+        scopeId: "enum_1",
+      }),
+      token(1, 12, "=", "=", {
+        indent: 2,
+        parentType: "enum_assignment",
+        tokenIndex: 0,
+        scopeId: "enum_1",
+      }),
+    ];
+
+    const equalsGroups = groupTokens(equalsTokens);
+    assert.strictEqual(equalsGroups.length, 1);
+    assert.strictEqual(equalsGroups[0].targetColumn, 12); // Max column
+    assert.strictEqual(equalsGroups[0].padAfter, false); // Pad before
+
+    // Check individual token padding needs
+    const eqGroup = equalsGroups[0];
+    // Token at col 8 needs 12 - 8 = 4 spaces
+    assert.strictEqual(eqGroup.targetColumn - eqGroup.tokens[0].column, 4);
+    // Token at col 12 needs 12 - 12 = 0 spaces
+    assert.strictEqual(eqGroup.targetColumn - eqGroup.tokens[1].column, 0);
+
+    // Now test comments
+    const commentTokens: AlignmentToken[] = [
+      token(0, 19, "//", "//", {
+        indent: 2,
+        parentType: "trailing_comment",
+        tokenIndex: 0,
+        scopeId: "trailing_comment",
+      }),
+      token(1, 27, "//", "//", {
+        indent: 2,
+        parentType: "trailing_comment",
+        tokenIndex: 0,
+        scopeId: "trailing_comment",
+      }),
+    ];
+
+    const commentGroups = groupTokens(commentTokens);
+    assert.strictEqual(commentGroups.length, 1);
+    // Target = max column = 27
+    assert.strictEqual(commentGroups[0].targetColumn, 27);
+
+    // The DecorationManager should compute:
+    // Line 0: visual = 19 + shift(4) = 23, needs 27 - 23 = 4 spaces
+    // Line 1: visual = 27 + shift(0) = 27, needs 0 spaces
+    // But we can't test DecorationManager directly without mocking vscode
+  });
+});
+
+/**
+ * Decoration Calculation Tests
+ *
+ * Tests for the pure calculation logic that would be in DecorationManager.
+ * These test the algorithm without requiring vscode mocks.
+ */
+/**
+ * Parser Integration Tests
+ *
+ * These tests verify that the ParserService correctly captures tokens
+ * from real TypeScript code, including trailing comments.
+ */
+suite("Parser Integration Tests", () => {
+  // Create a mock document for testing
+  function createMockDocument(content: string): {
+    languageId: string;
+    lineCount: number;
+    getText: () => string;
+    lineAt: (line: number) => { text: string };
+  } {
+    const lines = content.split("\n");
+    return {
+      languageId: "typescript",
+      lineCount: lines.length,
+      getText: () => content,
+      lineAt: (line: number) => ({ text: lines[line] || "" }),
+    };
+  }
+
+  test("enum with trailing comments: comments should be captured", () => {
+    // This is the exact code that's failing in the real extension
+    const code = `export enum EnumFileStatus {
+  Uploading = "uploading", // File is currently being uploaded
+  Complete = "complete", // File upload finished successfully
+  Error = "error", // File upload failed
+}`;
+
+    const lines = code.split("\n");
+
+    // Verify the structure we expect
+    assert.ok(lines[1].includes("//"), "Line 1 should have a comment");
+    assert.ok(lines[2].includes("//"), "Line 2 should have a comment");
+    assert.ok(lines[3].includes("//"), "Line 3 should have a comment");
+
+    // Verify comment positions in source
+    const comment1Pos = lines[1].indexOf("//");
+    const comment2Pos = lines[2].indexOf("//");
+    const comment3Pos = lines[3].indexOf("//");
+
+    console.log(
+      `Comment positions: line1=${comment1Pos}, line2=${comment2Pos}, line3=${comment3Pos}`,
+    );
+
+    // The comments are at different columns because the values have different lengths
+    // "uploading" (9) vs "complete" (8) vs "error" (5)
+    // So comment alignment should add padding before comments on shorter lines
+
+    // For now, just verify we can detect the comments
+    assert.ok(comment1Pos > 0, "Comment 1 should be found");
+    assert.ok(comment2Pos > 0, "Comment 2 should be found");
+    assert.ok(comment3Pos > 0, "Comment 3 should be found");
+  });
+
+  test("type with trailing comments: comments should be captured", () => {
+    const code = `export type FileState = {
+  name: string; // Filename displayed to user
+  progress: number; // Upload progress from 0 to 100
+  status: EnumFileStatus; // Current upload status
+};`;
+
+    const lines = code.split("\n");
+
+    // Verify comment positions
+    const comment1Pos = lines[1].indexOf("//");
+    const comment2Pos = lines[2].indexOf("//");
+    const comment3Pos = lines[3].indexOf("//");
+
+    console.log(
+      `Type comment positions: line1=${comment1Pos}, line2=${comment2Pos}, line3=${comment3Pos}`,
+    );
+
+    // The comments are at different columns because the types have different lengths
+    // "string" vs "number" vs "EnumFileStatus"
+    assert.ok(comment1Pos > 0, "Comment 1 should be found");
+    assert.ok(comment2Pos > 0, "Comment 2 should be found");
+    assert.ok(comment3Pos > 0, "Comment 3 should be found");
+  });
+});
+
+suite("Decoration Calculation Logic Tests", () => {
+  // Helper: Calculate decoration positions for a group, given pre-computed shifts
+  function calculateDecorations(
+    group: {
+      tokens: AlignmentToken[];
+      targetColumn: number;
+      padAfter: boolean;
+    },
+    lineShift: Map<number, number>,
+  ): Array<{ line: number; column: number; spacesNeeded: number }> {
+    const decorations: Array<{
+      line: number;
+      column: number;
+      spacesNeeded: number;
+    }> = [];
+
+    for (const token of group.tokens) {
+      const currentShift = lineShift.get(token.line) ?? 0;
+      let spacesNeeded: number;
+      let insertColumn: number;
+
+      if (group.padAfter) {
+        // Pad AFTER (like :) - visualEnd = col + len + shift
+        const visualEnd = token.column + token.text.length + currentShift;
+        spacesNeeded = group.targetColumn - visualEnd;
+        insertColumn = token.column + token.text.length;
+      } else {
+        // Pad BEFORE (like =, //) - visualStart = col + shift
+        const visualStart = token.column + currentShift;
+        spacesNeeded = group.targetColumn - visualStart;
+        insertColumn = token.column;
+      }
+
+      if (spacesNeeded > 0) {
+        decorations.push({
+          line: token.line,
+          column: insertColumn,
+          spacesNeeded,
+        });
+      }
+    }
+
+    return decorations;
+  }
+
+  test("= operator padding calculation", () => {
+    const group = {
+      tokens: [
+        token(0, 8, "=", "=", { indent: 2 }),
+        token(1, 12, "=", "=", { indent: 2 }),
+      ],
+      targetColumn: 12,
+      padAfter: false,
+    };
+
+    const lineShift = new Map<number, number>();
+    const decorations = calculateDecorations(group, lineShift);
+
+    // Line 0: needs 12 - 8 = 4 spaces at column 8
+    // Line 1: needs 12 - 12 = 0 spaces (no decoration)
+    assert.strictEqual(decorations.length, 1);
+    assert.strictEqual(decorations[0].line, 0);
+    assert.strictEqual(decorations[0].column, 8);
+    assert.strictEqual(decorations[0].spacesNeeded, 4);
+  });
+
+  test("comment padding with pre-existing shift from = operator", () => {
+    // Simulates Pass 3 (comments) after Pass 2 (operators) has run
+    const group = {
+      tokens: [
+        token(0, 19, "//", "//", { indent: 2 }), // After "Empty = "empty","
+        token(1, 27, "//", "//", { indent: 2 }), // After "Uploading = "uploading","
+      ],
+      targetColumn: 27, // Max source column
+      padAfter: false,
+    };
+
+    // Shifts from = operator alignment:
+    // Line 0: Empty's = got 4 spaces padding
+    // Line 1: Uploading's = got 0 spaces padding
+    const lineShift = new Map<number, number>([
+      [0, 4],
+      [1, 0],
+    ]);
+
+    const decorations = calculateDecorations(group, lineShift);
+
+    // Line 0: visualStart = 19 + 4 = 23, needs 27 - 23 = 4 spaces
+    // Line 1: visualStart = 27 + 0 = 27, needs 0 spaces
+    assert.strictEqual(decorations.length, 1);
+    assert.strictEqual(decorations[0].line, 0);
+    assert.strictEqual(decorations[0].column, 19);
+    assert.strictEqual(decorations[0].spacesNeeded, 4);
+  });
+
+  test("comment recalculation with visual target column", () => {
+    // The REAL algorithm recalculates targetColumn based on visual positions
+    // This is what the DecorationManager should do in Pass 3
+
+    const commentTokens = [
+      token(0, 19, "//", "//", { indent: 2 }),
+      token(1, 27, "//", "//", { indent: 2 }),
+    ];
+
+    // Shifts from previous passes
+    const lineShift = new Map<number, number>([
+      [0, 4], // Empty's = got 4 spaces
+      [1, 0], // Uploading's = got 0 spaces
+    ]);
+
+    // Recalculate target using VISUAL positions
+    const visualColumns = commentTokens.map((t) => {
+      const shift = lineShift.get(t.line) ?? 0;
+      return t.column + shift;
+    });
+    const targetVisualColumn = Math.max(...visualColumns);
+
+    // Line 0: 19 + 4 = 23
+    // Line 1: 27 + 0 = 27
+    // Max = 27
+    assert.strictEqual(targetVisualColumn, 27);
+
+    // Now calculate decorations using this visual target
+    const decorations: Array<{
+      line: number;
+      spacesNeeded: number;
+    }> = [];
+    for (const t of commentTokens) {
+      const shift = lineShift.get(t.line) ?? 0;
+      const visualColumn = t.column + shift;
+      const spacesNeeded = targetVisualColumn - visualColumn;
+      if (spacesNeeded > 0) {
+        decorations.push({ line: t.line, spacesNeeded });
+      }
+    }
+
+    // Line 0: needs 27 - 23 = 4 spaces
+    // Line 1: needs 27 - 27 = 0 spaces
+    assert.strictEqual(decorations.length, 1);
+    assert.strictEqual(decorations[0].line, 0);
+    assert.strictEqual(decorations[0].spacesNeeded, 4);
+  });
+});

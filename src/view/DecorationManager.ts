@@ -157,24 +157,35 @@ export class DecorationManager {
     // Process other regular operators normally
     for (const group of otherRegularGroups) {
       for (const token of group.tokens) {
+        // Get current accumulated shift for this line (from previous passes/operators)
+        const currentShift = lineShift.get(token.line) ?? 0;
+
         let spacesNeeded: number;
         let pos: vscode.Position;
 
         if (group.padAfter) {
           // For `:` - pad AFTER operator to align values
-          const operatorEndColumn = token.column + token.text.length;
-          spacesNeeded = group.targetColumn - operatorEndColumn;
-          pos = new vscode.Position(token.line, operatorEndColumn);
-
-          // Track this shift for comment alignment
-          if (spacesNeeded > 0) {
-            const currentShift = lineShift.get(token.line) ?? 0;
-            lineShift.set(token.line, currentShift + spacesNeeded);
-          }
+          // Visual end = document position + text length + accumulated shift
+          const visualEnd = token.column + token.text.length + currentShift;
+          spacesNeeded = group.targetColumn - visualEnd;
+          pos = new vscode.Position(
+            token.line,
+            token.column + token.text.length,
+          );
         } else {
           // For `=`, `&&`, `||` - pad BEFORE operator to align operators
-          spacesNeeded = group.targetColumn - token.column;
+          // Visual start = document position + accumulated shift
+          const visualStart = token.column + currentShift;
+          spacesNeeded = group.targetColumn - visualStart;
           pos = new vscode.Position(token.line, token.column);
+        }
+
+        // IMPORTANT: Always update lineShift for this line, even if no decoration is needed.
+        // This ensures Pass 3 (comments) sees the correct accumulated shift.
+        // If spacesNeeded is 0 or negative, we still need to preserve currentShift.
+        const actualSpacesAdded = Math.max(0, spacesNeeded);
+        if (actualSpacesAdded > 0) {
+          lineShift.set(token.line, currentShift + actualSpacesAdded);
         }
 
         if (spacesNeeded <= 0 || spacesNeeded > MAX_CACHED_WIDTH) {
