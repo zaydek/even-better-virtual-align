@@ -1,0 +1,6 @@
+# Tokens extracted from input.txt
+# Format: line, column, text, type, indent, parentType, tokenIndex, scopeId
+
+0, 8, "=", =, 0, variable_declaration, 0, scope_1
+1, 10, "=", =, 0, variable_declaration, 0, scope_1
+2, 10, "=", =, 0, variable_declaration, 0, scope_1

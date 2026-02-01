@@ -1,2 +1,5 @@
 # Don't format README - it has intentional alignment in code examples
 README.md
+
+# Don't format test fixtures - they have intentional alignment
+src/test/fixtures/**
