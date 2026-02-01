@@ -14,206 +14,23 @@ import {
   SupportedLanguage,
 } from "../core/types";
 
-// Type definitions matching @vscode/tree-sitter-wasm
-interface Point {
-  row: number;
-  column: number;
-}
-
-interface TreeNode {
-  id: number;
-  type: string;
-  text: string;
-  startPosition: Point;
-  parent: TreeNode | null;
-}
-
-interface Tree {
-  rootNode: TreeNode;
-  delete(): void;
-}
-
-interface QueryCapture {
-  name: string;
-  node: TreeNode;
-}
-
-interface Query {
-  captures(node: TreeNode): QueryCapture[];
-  delete(): void;
-}
-
-interface Language {
-  query(source: string): Query;
-}
-
-interface Parser {
-  setLanguage(language: Language): void;
-  parse(text: string): Tree | null;
-  delete(): void;
-}
-
-interface ParserClass {
-  init(options?: {
-    locateFile: (file: string, folder: string) => string;
-  }): Promise<void>;
-  new (): Parser;
-}
-
-interface LanguageClass {
-  load(path: string): Promise<Language>;
-}
-
-/**
- * Tree-sitter queries for extracting alignable operators.
- * Each query captures the operator token with @op.
- */
-const QUERIES: Record<string, string> = {
-  typescript: `
-    ; Variable declarations: const x = 1
-    (variable_declarator
-      name: (_)
-      "=" @op
-      value: (_))
-
-    ; Assignment expressions: x = 1
-    (assignment_expression
-      left: (_)
-      "=" @op
-      right: (_))
-
-    ; Enum member assignments: Up = "up"
-    (enum_assignment
-      name: (_)
-      "=" @op
-      value: (_))
-
-    ; Object properties: { key: value }
-    (pair
-      key: (_)
-      ":" @op
-      value: (_))
-
-    ; Type annotations: x: number
-    (type_annotation
-      ":" @op)
-
-    ; Logical operators
-    (binary_expression
-      operator: "&&" @op)
-    (binary_expression
-      operator: "||" @op)
-
-    ; Trailing comments: // comment
-    (comment) @op
-
-    ; Function calls: func(arg1, arg2, ...)
-    (call_expression
-      function: [(identifier) @func_name (member_expression property: (property_identifier) @func_name)]
-      arguments: (arguments) @func_args) @func_call
-  `,
-
-  // TSX uses the same query patterns as TypeScript
-  tsx: `
-    ; Variable declarations: const x = 1
-    (variable_declarator
-      name: (_)
-      "=" @op
-      value: (_))
-
-    ; Assignment expressions: x = 1
-    (assignment_expression
-      left: (_)
-      "=" @op
-      right: (_))
-
-    ; Enum member assignments: Up = "up"
-    (enum_assignment
-      name: (_)
-      "=" @op
-      value: (_))
-
-    ; Object properties: { key: value }
-    (pair
-      key: (_)
-      ":" @op
-      value: (_))
-
-    ; Type annotations: x: number
-    (type_annotation
-      ":" @op)
-
-    ; Logical operators
-    (binary_expression
-      operator: "&&" @op)
-    (binary_expression
-      operator: "||" @op)
-
-    ; Trailing comments: // comment
-    (comment) @op
-
-    ; Function calls: func(arg1, arg2, ...)
-    (call_expression
-      function: [(identifier) @func_name (member_expression property: (property_identifier) @func_name)]
-      arguments: (arguments) @func_args) @func_call
-  `,
-
-  python: `
-    ; Assignments: x = 1
-    (assignment
-      left: (_)
-      "=" @op
-      right: (_))
-
-    ; Keyword arguments: func(x=1)
-    (keyword_argument
-      name: (_)
-      "=" @op
-      value: (_))
-
-    ; Default parameters: def foo(x=1)
-    (default_parameter
-      name: (_)
-      "=" @op
-      value: (_))
-
-    ; Dictionary pairs: {"key": value}
-    (pair
-      key: (_)
-      ":" @op
-      value: (_))
-
-    ; Type annotations: x: int
-    (typed_parameter
-      ":" @op)
-
-    ; Boolean operators
-    (boolean_operator
-      operator: "and" @op)
-    (boolean_operator
-      operator: "or" @op)
-
-    ; Trailing comments: # comment
-    (comment) @op
-  `,
-
-  css: `
-    ; CSS declarations: property: value
-    (declaration
-      (property_name)
-      ":" @op)
-  `,
-};
-
-/**
- * WASM file names for each language (from @vscode/tree-sitter-wasm).
- */
-const WASM_FILES: Record<string, string> = {
-  typescript: "tree-sitter-typescript.wasm",
-  tsx: "tree-sitter-tsx.wasm",
-  python: "tree-sitter-python.wasm",
-  css: "tree-sitter-css.wasm",
-};
+// Import extracted modules
+import {
+  getParentType,
+  getScopeId,
+  isInsideStringOrComment,
+  normalizeOperator,
+} from "./ast-utils";
+import { QUERIES, WASM_FILES } from "./queries";
+import { getIndentLevel } from "./text-utils";
+import {
+  Language,
+  LanguageClass,
+  Parser,
+  ParserClass,
+  Query,
+  TreeNode,
+} from "./tree-sitter-types";
 
 export class ParserService {
   private initialized = false;
@@ -406,10 +223,10 @@ export class ParserService {
         }
 
         const operatorText = node.text;
-        const operatorType = this.normalizeOperator(operatorText);
+        const operatorType = normalizeOperator(operatorText);
 
         // Skip if inside a string or comment (but NOT if we're capturing the comment itself)
-        if (operatorType !== "//" && this.isInsideStringOrComment(node)) {
+        if (operatorType !== "//" && isInsideStringOrComment(node)) {
           continue;
         }
 
@@ -419,7 +236,7 @@ export class ParserService {
 
         // Get indentation level of this line
         const lineText = document.lineAt(line).text;
-        const indent = this.getIndentLevel(lineText);
+        const indent = getIndentLevel(lineText);
 
         // For comments, only include trailing comments (code before the comment)
         // Trailing comments use special grouping: ignore scopeId, use "trailing_comment" parentType
@@ -447,10 +264,19 @@ export class ParserService {
         }
 
         // Get parent type for structural grouping
-        const parentType = this.getParentType(node);
+        const parentType = getParentType(node);
 
         // Get scope ID - tokens in different scopes shouldn't align
-        const scopeId = this.getScopeId(node);
+        const scopeId = getScopeId(node);
+
+        // DEBUG: Log non-array scopes for pair colons
+        if (
+          operatorType === ":" &&
+          parentType === "pair" &&
+          !scopeId.startsWith("array_")
+        ) {
+          console.log(`EBVA: Non-array scope at L${line}: ${scopeId}`);
+        }
 
         captureData.push({
           line,
@@ -481,9 +307,32 @@ export class ParserService {
         }
       }
 
-      // For lines with 2+ colons from pairs (inline objects), find commas
+      // DEBUG: Write IMMEDIATELY to confirm extension is running
+      const fs = require("fs");
+      const debugPath = "/tmp/ebva-inline-debug.txt";
+      fs.writeFileSync(
+        debugPath,
+        `Extension running! captureData=${captureData.length}, colonsByLine entries=${colonsByLine.size}\n`,
+      );
+
+      // Log all colons with their parentType
+      for (const data of captureData) {
+        if (data.type === ":") {
+          fs.appendFileSync(
+            debugPath,
+            `  L${data.line}:${data.column} parentType="${data.parentType}" scope="${data.scopeId}"\n`,
+          );
+        }
+      }
+
       for (const [lineNum, colons] of colonsByLine) {
         if (colons.length < 2) continue;
+
+        // DEBUG: Write to file
+        fs.appendFileSync(
+          debugPath,
+          `INLINE L${lineNum}: ${colons.length} colons, scope="${colons[0].scopeId}"\n`,
+        );
 
         // This is an inline object - find commas between pairs
         const lineText = document.lineAt(lineNum).text;
@@ -555,7 +404,7 @@ export class ParserService {
         if (line < startLine || line > endLine) continue;
 
         const lineText = document.lineAt(line).text;
-        const indent = this.getIndentLevel(lineText);
+        const indent = getIndentLevel(lineText);
 
         funcCalls.push({
           line,
@@ -693,7 +542,7 @@ export class ParserService {
       }
 
       const lineText = document.lineAt(lineNum).text;
-      const indent = this.getIndentLevel(lineText);
+      const indent = getIndentLevel(lineText);
 
       // Find structural colons using state machine
       const colonPositions = this.findJsonColons(lineText);
@@ -786,7 +635,7 @@ export class ParserService {
       if (lineNum >= document.lineCount) break;
 
       const lineText = document.lineAt(lineNum).text;
-      const indent = this.getIndentLevel(lineText);
+      const indent = getIndentLevel(lineText);
 
       // Skip comments and empty lines
       const trimmed = lineText.trim();
@@ -998,7 +847,7 @@ export class ParserService {
         const lineText = lines[i];
         const docLine = lineOffset + i;
         const colonPositions = this.findJsonColons(lineText);
-        const indent = this.getIndentLevel(lineText);
+        const indent = getIndentLevel(lineText);
         const operatorCountOnLine = colonPositions.length;
 
         for (const colonPos of colonPositions) {
@@ -1030,7 +879,7 @@ export class ParserService {
         const lineText = lines[i];
         const docLine = lineOffset + i;
         const colonPositions = this.findYamlColons(lineText);
-        const indent = this.getIndentLevel(lineText);
+        const indent = getIndentLevel(lineText);
 
         // Skip comments and empty lines
         const trimmed = lineText.trim();
@@ -1106,19 +955,19 @@ export class ParserService {
           const blockLine = node.startPosition.row;
           const docLine = lineOffset + blockLine;
 
-          if (this.isInsideStringOrComment(node)) {
+          if (isInsideStringOrComment(node)) {
             continue;
           }
 
           const operatorText = node.text;
-          const operatorType = this.normalizeOperator(operatorText);
+          const operatorType = normalizeOperator(operatorText);
 
           if (!operatorType) {
             continue;
           }
 
           const lineText = lines[blockLine] || "";
-          const indent = this.getIndentLevel(lineText);
+          const indent = getIndentLevel(lineText);
 
           // For comments, only include trailing comments (code before the comment)
           if (operatorType === "//") {
@@ -1141,10 +990,10 @@ export class ParserService {
             continue;
           }
 
-          const parentType = this.getParentType(node);
+          const parentType = getParentType(node);
 
           // Combine block scope with AST scope for fine-grained grouping
-          const astScopeId = this.getScopeId(node);
+          const astScopeId = getScopeId(node);
           const scopeId = `${blockScopeId}_${astScopeId}`;
 
           captureData.push({
@@ -1521,110 +1370,6 @@ export class ParserService {
     }
 
     return null;
-  }
-
-  /**
-   * Checks if a node is inside a string or comment.
-   */
-  private isInsideStringOrComment(node: TreeNode): boolean {
-    const ignoredTypes = new Set([
-      "string",
-      "template_string",
-      "string_literal",
-      "comment",
-      "line_comment",
-      "block_comment",
-      "string_fragment",
-      "interpolation",
-      "formatted_string",
-    ]);
-
-    let current: TreeNode | null = node.parent;
-    while (current) {
-      if (ignoredTypes.has(current.type)) {
-        return true;
-      }
-      current = current.parent;
-    }
-    return false;
-  }
-
-  /**
-   * Normalizes operator text to a canonical type.
-   */
-  private normalizeOperator(text: string): OperatorType | null {
-    switch (text) {
-      case "=":
-        return "=";
-      case ":":
-        return ":";
-      case ",":
-        return ",";
-      case "&&":
-        return "&&";
-      case "||":
-        return "||";
-      case "and":
-        return "and";
-      case "or":
-        return "or";
-      default:
-        // Check for comments (// ... or # ...)
-        if (text.startsWith("//") || text.startsWith("#")) {
-          return "//";
-        }
-        return null;
-    }
-  }
-
-  /**
-   * Gets the indentation level (leading whitespace count) of a line.
-   */
-  private getIndentLevel(lineText: string): number {
-    const match = lineText.match(/^(\s*)/);
-    return match ? match[1].length : 0;
-  }
-
-  /**
-   * Gets the AST parent type for structural grouping.
-   * Tokens with different parent types should not align.
-   */
-  private getParentType(node: TreeNode): string {
-    // The parent of the operator tells us its structural role
-    // e.g., "pair" for JSON objects, "property_signature" for TS interfaces
-    return node.parent?.type ?? "unknown";
-  }
-
-  /**
-   * Gets a scope identifier for context-aware grouping.
-   * Tokens in different scopes (different objects, blocks) shouldn't align.
-   */
-  private getScopeId(node: TreeNode): string {
-    const scopeTypes = new Set([
-      "object",
-      "object_pattern",
-      "array",
-      "statement_block",
-      "block",
-      "class_body",
-      "dictionary",
-      "list",
-      "function_definition",
-      "class_definition",
-      "if_statement",
-      "for_statement",
-      "while_statement",
-    ]);
-
-    let current: TreeNode | null = node.parent;
-    while (current) {
-      if (scopeTypes.has(current.type)) {
-        // Use node ID as unique scope identifier
-        return `${current.type}_${current.id}`;
-      }
-      current = current.parent;
-    }
-    return "root";
   }
 
   /**

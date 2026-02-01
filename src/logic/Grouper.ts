@@ -33,6 +33,10 @@ export function groupTokens(tokens: AlignmentToken[]): AlignmentGroup[] {
   for (const token of tokens) {
     let key: string;
 
+    // Check if this token is in an array scope (for array sibling alignment)
+    // The parser normalizes all array-like scopes to start with "array_"
+    const isArrayScope = token.scopeId.startsWith("array_");
+
     if (token.parentType === "trailing_comment") {
       // Trailing comments: group by type, indent, parentType, scopeId ONLY
       // Ignore tokenIndex - comments should align regardless of how many
@@ -43,15 +47,19 @@ export function groupTokens(tokens: AlignmentToken[]): AlignmentGroup[] {
       key = `${token.type}|${token.indent}|${token.parentType}|${token.tokenIndex}|${token.scopeId}`;
     } else if (
       token.operatorCountOnLine > 1 &&
-      token.parentType !== "function_arguments"
+      token.parentType !== "function_arguments" &&
+      !isArrayScope
     ) {
       // Inline object (multiple operators on one line): isolate by line
       // Each inline object is a separate type, don't align across them
-      // Exception: function_arguments should align across lines
+      // Exception 1: function_arguments should align across lines
+      // Exception 2: array scope - inline objects that are siblings in an array
+      //              should have ALL their operators align (commas AND colons)
       key = `${token.type}|${token.indent}|${token.parentType}|${token.tokenIndex}|line_${token.line}`;
     } else {
       // Multi-line block (one operator per line): use scopeId for shared alignment
       // Also applies to function_arguments regardless of operatorCountOnLine
+      // Also applies to array-scoped inline objects (allows full sibling alignment)
       key = `${token.type}|${token.indent}|${token.parentType}|${token.tokenIndex}|${token.scopeId}`;
     }
     if (!buckets.has(key)) {

@@ -5,572 +5,7 @@
 import * as assert from "assert";
 import { AlignmentToken } from "../core/types";
 import { groupTokens } from "../logic/Grouper";
-
-// Helper to create tokens with default values
-function token(
-  line: number,
-  column: number,
-  text: string,
-  type: "=" | ":" | "," | "&&" | "||" | "and" | "or" | "//" | "funcArg",
-  opts?: {
-    indent?: number;
-    parentType?: string;
-    tokenIndex?: number;
-    scopeId?: string;
-    operatorCountOnLine?: number;
-  },
-): AlignmentToken {
-  return {
-    line,
-    column,
-    text,
-    type,
-    indent: opts?.indent ?? 0,
-    parentType: opts?.parentType ?? "pair",
-    tokenIndex: opts?.tokenIndex ?? 0,
-    scopeId: opts?.scopeId ?? "default_scope",
-    operatorCountOnLine: opts?.operatorCountOnLine ?? 1,
-  };
-}
-
-suite("Grouper Tests", () => {
-  test("groups consecutive tokens with same type, indent, parentType, and tokenIndex", () => {
-    const tokens: AlignmentToken[] = [
-      token(0, 10, "=", "=", { indent: 2, parentType: "variable_declaration" }),
-      token(1, 5, "=", "=", { indent: 2, parentType: "variable_declaration" }),
-      token(2, 8, "=", "=", { indent: 2, parentType: "variable_declaration" }),
-    ];
-
-    const groups = groupTokens(tokens);
-
-    assert.strictEqual(groups.length, 1);
-    assert.strictEqual(groups[0].tokens.length, 3);
-    // For `=` operators, padAfter=false, so targetColumn = max(column) = 10
-    assert.strictEqual(groups[0].targetColumn, 10);
-  });
-
-  test("separates tokens with different types", () => {
-    const tokens: AlignmentToken[] = [
-      token(0, 5, "=", "=", { indent: 0 }),
-      token(1, 5, ":", ":", { indent: 0 }),
-    ];
-
-    const groups = groupTokens(tokens);
-
-    // Each token is alone, so no groups (groups require 2+ tokens)
-    assert.strictEqual(groups.length, 0);
-  });
-
-  test("separates tokens with different indentation (nesting levels)", () => {
-    // This tests the JSON nesting problem
-    const tokens: AlignmentToken[] = [
-      // Outer object property
-      token(0, 15, ":", ":", { indent: 2, parentType: "pair" }),
-      // Inner object property (different indent)
-      token(1, 25, ":", ":", { indent: 4, parentType: "pair" }),
-    ];
-
-    const groups = groupTokens(tokens);
-
-    // Different indents = no grouping
-    assert.strictEqual(groups.length, 0);
-  });
-
-  test("separates tokens with different parent types", () => {
-    // This tests the TypeScript structure problem
-    const tokens: AlignmentToken[] = [
-      // Type annotation colon
-      token(0, 12, ":", ":", { indent: 0, parentType: "type_annotation" }),
-      // Object property colon
-      token(1, 8, ":", ":", { indent: 2, parentType: "pair" }),
-    ];
-
-    const groups = groupTokens(tokens);
-
-    // Different parent types = no grouping
-    assert.strictEqual(groups.length, 0);
-  });
-
-  test("separates tokens with different token indices", () => {
-    // This tests { line: 0, column: 5 } case
-    // The "line:" (index 0) should not align with "column:" (index 1)
-    // With the bucket-based grouper, tokens are grouped by (type, indent, parentType, tokenIndex)
-    const tokens: AlignmentToken[] = [
-      // Line 0
-      token(0, 8, ":", ":", { indent: 2, parentType: "pair", tokenIndex: 0 }),
-      token(0, 15, ":", ":", { indent: 2, parentType: "pair", tokenIndex: 1 }),
-      // Line 1 (consecutive)
-      token(1, 8, ":", ":", { indent: 2, parentType: "pair", tokenIndex: 0 }),
-      token(1, 15, ":", ":", { indent: 2, parentType: "pair", tokenIndex: 1 }),
-    ];
-
-    const groups = groupTokens(tokens);
-
-    // Should form 2 groups: one for tokenIndex 0, one for tokenIndex 1
-    assert.strictEqual(groups.length, 2);
-
-    // Group 0: both colons with tokenIndex 0
-    assert.strictEqual(groups[0].tokens.length, 2);
-    assert.strictEqual(groups[0].tokens[0].tokenIndex, 0);
-    assert.strictEqual(groups[0].tokens[1].tokenIndex, 0);
-
-    // Group 1: both colons with tokenIndex 1
-    assert.strictEqual(groups[1].tokens.length, 2);
-    assert.strictEqual(groups[1].tokens[0].tokenIndex, 1);
-    assert.strictEqual(groups[1].tokens[1].tokenIndex, 1);
-  });
-
-  test("breaks group on non-consecutive lines", () => {
-    const tokens: AlignmentToken[] = [
-      token(0, 5, "=", "=", { indent: 0, parentType: "declaration" }),
-      token(1, 5, "=", "=", { indent: 0, parentType: "declaration" }),
-      // Gap of 2 lines (blank line between)
-      token(4, 5, "=", "=", { indent: 0, parentType: "declaration" }),
-      token(5, 5, "=", "=", { indent: 0, parentType: "declaration" }),
-    ];
-
-    const groups = groupTokens(tokens);
-
-    assert.strictEqual(groups.length, 2);
-  });
-
-  test("handles empty input", () => {
-    const groups = groupTokens([]);
-    assert.strictEqual(groups.length, 0);
-  });
-
-  test("handles single token (no group formed)", () => {
-    const tokens: AlignmentToken[] = [token(0, 5, "=", "=")];
-
-    const groups = groupTokens(tokens);
-    assert.strictEqual(groups.length, 0);
-  });
-
-  test("calculates target column for colon operators", () => {
-    const tokens: AlignmentToken[] = [
-      token(0, 5, ":", ":", { indent: 2, parentType: "pair" }),
-      token(1, 10, ":", ":", { indent: 2, parentType: "pair" }),
-    ];
-
-    const groups = groupTokens(tokens);
-
-    // For `:` operators, padAfter=true, so targetColumn = max(column + text.length) = max(6, 11) = 11
-    assert.strictEqual(groups[0].targetColumn, 11);
-  });
-
-  test("real-world JSON example: nested objects don't align", () => {
-    // Simulating:
-    // {
-    //   "dependencies": {
-    //     "@pkg": "1.0"
-    //   }
-    // }
-    const tokens: AlignmentToken[] = [
-      token(1, 16, ":", ":", { indent: 2, parentType: "pair" }), // "dependencies":
-      token(2, 11, ":", ":", { indent: 4, parentType: "pair" }), // "@pkg":
-    ];
-
-    const groups = groupTokens(tokens);
-
-    // Different indents = no grouping, even though both are "pair" type
-    assert.strictEqual(groups.length, 0);
-  });
-
-  test("real-world TypeScript: array of objects aligns per-column", () => {
-    // Simulating:
-    // [
-    //   { line: 0, column: 5 },
-    //   { line: 1, column: 10 }
-    // ]
-    // Note: This test simulates SINGLE objects per line (one-property-per-line)
-    // For the grouper to work, tokens must be on consecutive lines
-    // Let's test with objects on separate lines, each with one property
-    const tokens: AlignmentToken[] = [
-      token(1, 8, ":", ":", { indent: 4, parentType: "pair", tokenIndex: 0 }), // { line: 0 }
-      token(2, 8, ":", ":", { indent: 4, parentType: "pair", tokenIndex: 0 }), // { line: 1 }
-    ];
-
-    const groups = groupTokens(tokens);
-
-    // One group: both colons at same tokenIndex on consecutive lines
-    assert.strictEqual(groups.length, 1);
-    assert.strictEqual(groups[0].tokens.length, 2);
-  });
-
-  test("YAML nested structure: each indent level aligns independently", () => {
-    // Simulating:
-    // spec:
-    //   replicas: 3
-    //   strategy: RollingUpdate
-    //   selector:
-    //     app:  backend
-    //     tier: production
-    const tokens: AlignmentToken[] = [
-      // Level 1 (indent 0): spec:
-      token(0, 4, ":", ":", { indent: 0, parentType: "pair", tokenIndex: 0 }),
-      // Level 2 (indent 2): replicas, strategy, selector
-      token(1, 10, ":", ":", { indent: 2, parentType: "pair", tokenIndex: 0 }), // replicas:
-      token(2, 10, ":", ":", { indent: 2, parentType: "pair", tokenIndex: 0 }), // strategy:
-      token(3, 10, ":", ":", { indent: 2, parentType: "pair", tokenIndex: 0 }), // selector:
-      // Level 3 (indent 4): app, tier
-      token(4, 7, ":", ":", { indent: 4, parentType: "pair", tokenIndex: 0 }), // app:
-      token(5, 8, ":", ":", { indent: 4, parentType: "pair", tokenIndex: 0 }), // tier:
-    ];
-
-    const groups = groupTokens(tokens);
-
-    // Should form 2 groups:
-    // - Group 1: replicas, strategy, selector (indent 2, consecutive lines 1-3)
-    // - Group 2: app, tier (indent 4, consecutive lines 4-5)
-    // Note: spec: at line 0 is alone (different indent from line 1)
-    assert.strictEqual(groups.length, 2);
-
-    // First group: replicas, strategy, selector
-    assert.strictEqual(groups[0].tokens.length, 3);
-    assert.strictEqual(groups[0].tokens[0].indent, 2);
-    assert.strictEqual(groups[0].tokens[1].indent, 2);
-    assert.strictEqual(groups[0].tokens[2].indent, 2);
-
-    // Second group: app, tier
-    assert.strictEqual(groups[1].tokens.length, 2);
-    assert.strictEqual(groups[1].tokens[0].indent, 4);
-    assert.strictEqual(groups[1].tokens[1].indent, 4);
-  });
-
-  test("padAfter is true for colon operators, false for equals", () => {
-    const colonTokens: AlignmentToken[] = [
-      token(0, 5, ":", ":", { indent: 0, parentType: "pair" }),
-      token(1, 10, ":", ":", { indent: 0, parentType: "pair" }),
-    ];
-    const equalsTokens: AlignmentToken[] = [
-      token(0, 5, "=", "=", { indent: 0, parentType: "assignment" }),
-      token(1, 10, "=", "=", { indent: 0, parentType: "assignment" }),
-    ];
-
-    const colonGroups = groupTokens(colonTokens);
-    const equalsGroups = groupTokens(equalsTokens);
-
-    // Colons pad after
-    assert.strictEqual(colonGroups[0].padAfter, true);
-    // Equals pad before
-    assert.strictEqual(equalsGroups[0].padAfter, false);
-  });
-});
-
-suite("Types Tests", () => {
-  test("isSupportedLanguage returns true for supported languages", () => {
-    const { isSupportedLanguage } = require("../core/types");
-    assert.strictEqual(isSupportedLanguage("typescript"), true);
-    assert.strictEqual(isSupportedLanguage("typescriptreact"), true);
-    assert.strictEqual(isSupportedLanguage("json"), true);
-    assert.strictEqual(isSupportedLanguage("jsonc"), true);
-    assert.strictEqual(isSupportedLanguage("yaml"), true);
-    assert.strictEqual(isSupportedLanguage("python"), true);
-    assert.strictEqual(isSupportedLanguage("css"), true);
-    assert.strictEqual(isSupportedLanguage("scss"), true);
-    assert.strictEqual(isSupportedLanguage("less"), true);
-    assert.strictEqual(isSupportedLanguage("markdown"), true);
-  });
-
-  test("isSupportedLanguage returns false for unsupported languages", () => {
-    const { isSupportedLanguage } = require("../core/types");
-    assert.strictEqual(isSupportedLanguage("javascript"), false);
-    assert.strictEqual(isSupportedLanguage("rust"), false);
-    assert.strictEqual(isSupportedLanguage("go"), false);
-  });
-});
-
-/**
- * JSON Colon Finder Tests
- *
- * These test cases verify that the state machine correctly identifies
- * structural colons (key-value separators) and ignores colons inside strings.
- */
-suite("JSON Colon Finder Edge Cases", () => {
-  // Helper that mimics the findJsonColons state machine
-  function findJsonColons(line: string): number[] {
-    const colonPositions: number[] = [];
-    let inString = false;
-    let escaped = false;
-    let lastStringEnd = -1;
-
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i];
-
-      if (escaped) {
-        escaped = false;
-        continue;
-      }
-
-      if (char === "\\" && inString) {
-        escaped = true;
-        continue;
-      }
-
-      if (char === '"') {
-        if (!inString) {
-          inString = true;
-        } else {
-          inString = false;
-          lastStringEnd = i;
-        }
-        continue;
-      }
-
-      if (char === ":" && !inString && lastStringEnd !== -1) {
-        const between = line.substring(lastStringEnd + 1, i);
-        if (/^\s*$/.test(between)) {
-          colonPositions.push(i);
-        }
-        lastStringEnd = -1;
-      }
-    }
-
-    return colonPositions;
-  }
-
-  test("simple key-value", () => {
-    const line = '  "name": "value"';
-    const colons = findJsonColons(line);
-    assert.strictEqual(colons.length, 1);
-    assert.strictEqual(colons[0], 8); // Position of the structural colon
-  });
-
-  test("key with colon in name (THE BUG)", () => {
-    // This was the original bug: "vscode:prepublish" has a colon inside
-    const line = '  "vscode:prepublish": "npm run compile"';
-    const colons = findJsonColons(line);
-    assert.strictEqual(colons.length, 1);
-    // The colon is at position 21 (0-indexed): spaces(2) + quote + "vscode:prepublish" (18) + quote = 21
-    assert.strictEqual(colons[0], 21);
-  });
-
-  test("multiple colons in key", () => {
-    const line = '  "a:b:c:d": "value"';
-    const colons = findJsonColons(line);
-    assert.strictEqual(colons.length, 1);
-    // Should find only the structural colon, not the ones inside the key
-  });
-
-  test("URL in value (colon after http)", () => {
-    const line = '  "url": "http://example.com:8080"';
-    const colons = findJsonColons(line);
-    assert.strictEqual(colons.length, 1);
-    assert.strictEqual(colons[0], 7); // Only the key-value colon
-  });
-
-  test("escaped quote in key", () => {
-    const line = '  "key\\"name": "value"';
-    const colons = findJsonColons(line);
-    assert.strictEqual(colons.length, 1);
-  });
-
-  test("escaped backslash before quote", () => {
-    // "path\\" means the string ends after \\, the quote after is the real closing quote
-    const line = '  "path\\\\": "value"';
-    const colons = findJsonColons(line);
-    assert.strictEqual(colons.length, 1);
-  });
-
-  test("escaped quote followed by colon in key", () => {
-    const line = '  "key\\":name": "value"';
-    const colons = findJsonColons(line);
-    assert.strictEqual(colons.length, 1);
-  });
-
-  test("number value", () => {
-    const line = '  "count": 42';
-    const colons = findJsonColons(line);
-    assert.strictEqual(colons.length, 1);
-  });
-
-  test("boolean value", () => {
-    const line = '  "enabled": true';
-    const colons = findJsonColons(line);
-    assert.strictEqual(colons.length, 1);
-  });
-
-  test("null value", () => {
-    const line = '  "data": null';
-    const colons = findJsonColons(line);
-    assert.strictEqual(colons.length, 1);
-  });
-
-  test("empty key", () => {
-    const line = '  "": "empty key"';
-    const colons = findJsonColons(line);
-    assert.strictEqual(colons.length, 1);
-  });
-
-  test("empty value", () => {
-    const line = '  "key": ""';
-    const colons = findJsonColons(line);
-    assert.strictEqual(colons.length, 1);
-  });
-
-  test("no space after colon", () => {
-    const line = '  "key":"value"';
-    const colons = findJsonColons(line);
-    assert.strictEqual(colons.length, 1);
-  });
-
-  test("multiple spaces after colon", () => {
-    const line = '  "key":    "value"';
-    const colons = findJsonColons(line);
-    assert.strictEqual(colons.length, 1);
-  });
-
-  test("inline nested object (multiple colons)", () => {
-    const line = '  "config": { "inner:key": "value" }';
-    const colons = findJsonColons(line);
-    // Should find 2 structural colons: after "config" and after "inner:key"
-    assert.strictEqual(colons.length, 2);
-  });
-
-  test("array with colons in strings", () => {
-    const line = '  "items": ["a:b", "c:d"]';
-    const colons = findJsonColons(line);
-    assert.strictEqual(colons.length, 1); // Only the key-value colon
-  });
-
-  test("multiple key-value pairs on one line", () => {
-    const line = '{ "a": 1, "b:c": 2, "d": 3 }';
-    const colons = findJsonColons(line);
-    assert.strictEqual(colons.length, 3); // Three structural colons
-  });
-
-  test("complex nested with colons everywhere", () => {
-    const line = '  "key:with:colons": { "nested:key": "value:with:colons" }';
-    const colons = findJsonColons(line);
-    assert.strictEqual(colons.length, 2); // Only the two structural colons
-  });
-});
-
-/**
- * Gofmt-style Alignment Integration Tests
- *
- * These test real-world scenarios to ensure the complete pipeline works correctly.
- */
-suite("Gofmt-style Alignment Scenarios", () => {
-  test("interface properties align (Go struct-like)", () => {
-    // interface User {
-    //   id:          number;
-    //   name:        string;
-    //   description: string;
-    // }
-    const tokens: AlignmentToken[] = [
-      token(1, 4, ":", ":", {
-        indent: 2,
-        parentType: "property_signature",
-        tokenIndex: 0,
-      }),
-      token(2, 6, ":", ":", {
-        indent: 2,
-        parentType: "property_signature",
-        tokenIndex: 0,
-      }),
-      token(3, 13, ":", ":", {
-        indent: 2,
-        parentType: "property_signature",
-        tokenIndex: 0,
-      }),
-    ];
-
-    const groups = groupTokens(tokens);
-
-    assert.strictEqual(groups.length, 1);
-    assert.strictEqual(groups[0].tokens.length, 3);
-    // For `:` operators, padAfter=true, targetColumn = max(column + text.length)
-    // = max(4+1, 6+1, 13+1) = max(5, 7, 14) = 14
-    assert.strictEqual(groups[0].targetColumn, 14);
-  });
-
-  test("const declarations align (Go var-like)", () => {
-    // const x     = 1;
-    // const foo   = 2;
-    // const bar   = 3;
-    const tokens: AlignmentToken[] = [
-      token(0, 8, "=", "=", {
-        indent: 0,
-        parentType: "variable_declaration",
-        tokenIndex: 0,
-      }),
-      token(1, 10, "=", "=", {
-        indent: 0,
-        parentType: "variable_declaration",
-        tokenIndex: 0,
-      }),
-      token(2, 10, "=", "=", {
-        indent: 0,
-        parentType: "variable_declaration",
-        tokenIndex: 0,
-      }),
-    ];
-
-    const groups = groupTokens(tokens);
-
-    assert.strictEqual(groups.length, 1);
-    assert.strictEqual(groups[0].tokens.length, 3);
-  });
-
-  test("blank line breaks alignment group", () => {
-    // const a = 1;
-    // const b = 2;
-    //
-    // const c = 3;
-    // const d = 4;
-    const tokens: AlignmentToken[] = [
-      token(0, 8, "=", "=", { indent: 0, parentType: "variable_declaration" }),
-      token(1, 8, "=", "=", { indent: 0, parentType: "variable_declaration" }),
-      // Line 2 is blank
-      token(3, 8, "=", "=", { indent: 0, parentType: "variable_declaration" }),
-      token(4, 8, "=", "=", { indent: 0, parentType: "variable_declaration" }),
-    ];
-
-    const groups = groupTokens(tokens);
-
-    // Should be 2 separate groups due to the blank line gap
-    assert.strictEqual(groups.length, 2);
-  });
-
-  test("type annotation does NOT align with object property", () => {
-    // const tokens: AlignmentToken[] = [  <- type annotation
-    //   { line: 0, column: 5 },            <- object property
-    // ];
-    const tokens: AlignmentToken[] = [
-      token(0, 13, ":", ":", {
-        indent: 0,
-        parentType: "type_annotation",
-        tokenIndex: 0,
-      }),
-      token(1, 8, ":", ":", { indent: 2, parentType: "pair", tokenIndex: 0 }),
-    ];
-
-    const groups = groupTokens(tokens);
-
-    // No alignment: different parent types AND different indentation
-    assert.strictEqual(groups.length, 0);
-  });
-
-  test("ternary colons should NOT align with object properties", () => {
-    // const x = cond ? "a" : "b";
-    // const obj = { key: value };
-    // These should NOT align because ternary : is a different parent type
-    const tokens: AlignmentToken[] = [
-      token(0, 22, ":", ":", {
-        indent: 0,
-        parentType: "ternary_expression",
-        tokenIndex: 0,
-      }),
-      token(1, 18, ":", ":", { indent: 0, parentType: "pair", tokenIndex: 0 }),
-    ];
-
-    const groups = groupTokens(tokens);
-
-    // Different parent types = no alignment
-    assert.strictEqual(groups.length, 0);
-  });
-});
+import { token } from "./test-helpers";
 
 /**
  * Inline Multi-Property Object Alignment Tests
@@ -1589,6 +1024,571 @@ suite("Trailing Comment Alignment Tests", () => {
  * Tests for the pure calculation logic that would be in DecorationManager.
  * These test the algorithm without requiring vscode mocks.
  */
+/**
+ * Array of Inline Objects Alignment Tests
+ *
+ * Tests for aligning inline objects that are siblings in an array:
+ * [
+ *   { groupName: "key",       elementNamePattern: "^key$" },
+ *   { groupName: "ref",       elementNamePattern: "^ref$" },
+ *   { groupName: "className", elementNamePattern: "^className$" },
+ * ]
+ *
+ * Each inline object is a separate AST node, but they should align because
+ * they're consecutive siblings in the same array with the same shape.
+ */
+suite("Array of Inline Objects Alignment Tests", () => {
+  test("inline objects in array with different scopeIds don't align (grouper behavior)", () => {
+    // This tests the grouper behavior: tokens with different scopeIds don't group.
+    // The FIX is in the ParserService - it should assign the SAME scopeId
+    // (the array's scope) to inline objects that are siblings in an array.
+    //
+    // This test verifies the grouper correctly separates different scopes.
+    // A separate integration test verifies the parser assigns shared scopes.
+    const tokens: AlignmentToken[] = [
+      // Line 0: { groupName: "key", elementNamePattern: "^key$" }
+      token(0, 14, ":", ":", {
+        indent: 4,
+        parentType: "pair",
+        tokenIndex: 0,
+        scopeId: "object_1", // Different scope
+        operatorCountOnLine: 2,
+      }),
+      // Line 1: { groupName: "ref", elementNamePattern: "^ref$" }
+      token(1, 14, ":", ":", {
+        indent: 4,
+        parentType: "pair",
+        tokenIndex: 0,
+        scopeId: "object_2", // Different scope
+        operatorCountOnLine: 2,
+      }),
+    ];
+
+    const groups = groupTokens(tokens);
+
+    // Grouper correctly separates different scopeIds
+    assert.strictEqual(
+      groups.length,
+      0,
+      "Different scopeIds should not group together",
+    );
+  });
+
+  test("inline objects with SAME scopeId DO align (control test)", () => {
+    // This is the control test - if we force the same scopeId, alignment works
+    const tokens: AlignmentToken[] = [
+      // Line 0
+      token(0, 14, ":", ":", {
+        indent: 4,
+        parentType: "pair",
+        tokenIndex: 0,
+        scopeId: "array_siblings", // Same scope!
+        operatorCountOnLine: 2,
+      }),
+      // Line 1
+      token(1, 14, ":", ":", {
+        indent: 4,
+        parentType: "pair",
+        tokenIndex: 0,
+        scopeId: "array_siblings", // Same scope!
+        operatorCountOnLine: 2,
+      }),
+    ];
+
+    const groups = groupTokens(tokens);
+
+    // With same scopeId, tokenIndex 0 should group
+    assert.strictEqual(groups.length, 1);
+    assert.strictEqual(groups[0].tokens.length, 2);
+  });
+
+  test("ESLint config pattern: customGroups array alignment", () => {
+    // Real-world example from the screenshot:
+    // customGroups: [
+    //   { groupName: "key",       elementNamePattern: "^key$" },
+    //   { groupName: "ref",       elementNamePattern: "^ref$" },
+    //   { groupName: "id",        elementNamePattern: "^id$" },
+    //   { groupName: "className", elementNamePattern: "^className$" },
+    // ]
+    //
+    // Expected alignment:
+    // - All "groupName:" colons align (tokenIndex 0)
+    // - All commas after values align (tokenIndex 1) - pads "key" to match "className"
+    // - All "elementNamePattern:" colons align (tokenIndex 2)
+    //
+    // NOTE: scopeId starts with "array_" to trigger array sibling alignment
+    const tokens: AlignmentToken[] = [
+      // Line 0: "key"
+      token(0, 14, ":", ":", {
+        indent: 6,
+        parentType: "pair",
+        tokenIndex: 0,
+        scopeId: "array_123", // Array scope triggers sibling alignment
+        operatorCountOnLine: 3,
+      }),
+      token(0, 20, ",", ",", {
+        indent: 6,
+        parentType: "inline_object",
+        tokenIndex: 1,
+        scopeId: "array_123",
+        operatorCountOnLine: 3,
+      }),
+      token(0, 42, ":", ":", {
+        indent: 6,
+        parentType: "pair",
+        tokenIndex: 2,
+        scopeId: "array_123",
+        operatorCountOnLine: 3,
+      }),
+      // Line 1: "ref"
+      token(1, 14, ":", ":", {
+        indent: 6,
+        parentType: "pair",
+        tokenIndex: 0,
+        scopeId: "array_123",
+        operatorCountOnLine: 3,
+      }),
+      token(1, 20, ",", ",", {
+        indent: 6,
+        parentType: "inline_object",
+        tokenIndex: 1,
+        scopeId: "array_123",
+        operatorCountOnLine: 3,
+      }),
+      token(1, 42, ":", ":", {
+        indent: 6,
+        parentType: "pair",
+        tokenIndex: 2,
+        scopeId: "array_123",
+        operatorCountOnLine: 3,
+      }),
+      // Line 2: "className" (longest)
+      token(2, 14, ":", ":", {
+        indent: 6,
+        parentType: "pair",
+        tokenIndex: 0,
+        scopeId: "array_123",
+        operatorCountOnLine: 3,
+      }),
+      token(2, 26, ",", ",", {
+        indent: 6,
+        parentType: "inline_object",
+        tokenIndex: 1,
+        scopeId: "array_123",
+        operatorCountOnLine: 3,
+      }),
+      token(2, 48, ":", ":", {
+        indent: 6,
+        parentType: "pair",
+        tokenIndex: 2,
+        scopeId: "array_123",
+        operatorCountOnLine: 3,
+      }),
+    ];
+
+    const groups = groupTokens(tokens);
+
+    // With array scope, ALL operators should align across lines:
+    // - tokenIndex 0 (first colons): 1 group with 3 tokens
+    // - tokenIndex 1 (commas): 1 group with 3 tokens
+    // - tokenIndex 2 (second colons): 1 group with 3 tokens
+    assert.strictEqual(
+      groups.length,
+      3,
+      "Should have 3 groups (2 colons + 1 comma)",
+    );
+
+    // Group for first colons (tokenIndex 0)
+    const colonGroup0 = groups.find(
+      (g) => g.tokens[0].type === ":" && g.tokens[0].tokenIndex === 0,
+    );
+    assert.ok(colonGroup0, "Should have a group for first colons");
+    assert.strictEqual(colonGroup0!.tokens.length, 3);
+    // All at same column, so targetColumn = 14 + 1 = 15 (padAfter)
+    assert.strictEqual(colonGroup0!.targetColumn, 15);
+
+    // Group for commas (tokenIndex 1)
+    const commaGroup = groups.find((g) => g.tokens[0].type === ",");
+    assert.ok(commaGroup, "Should have a group for commas");
+    assert.strictEqual(commaGroup!.tokens.length, 3);
+    // Commas at col 20, 20, 26 - max end = 27 (padAfter)
+    assert.strictEqual(commaGroup!.targetColumn, 27);
+
+    // Group for second colons (tokenIndex 2)
+    const colonGroup2 = groups.find(
+      (g) => g.tokens[0].type === ":" && g.tokens[0].tokenIndex === 2,
+    );
+    assert.ok(colonGroup2, "Should have a group for second colons");
+    assert.strictEqual(colonGroup2!.tokens.length, 3);
+    // Colons at col 42, 42, 48 - max end = 49 (padAfter)
+    assert.strictEqual(colonGroup2!.targetColumn, 49);
+  });
+
+  test("array sibling inline objects: full alignment for all token indices", () => {
+    // When inline objects share an array scope (array_* or list_*),
+    // ALL their tokens should align, not just tokenIndex 0
+    //
+    // [
+    //   { a: 1,   b: 10  },
+    //   { a: 100, b: 1   },
+    // ]
+    const tokens: AlignmentToken[] = [
+      // Line 0: { a: 1, b: 10 }
+      token(0, 6, ":", ":", {
+        indent: 4,
+        parentType: "pair",
+        tokenIndex: 0,
+        scopeId: "array_42",
+        operatorCountOnLine: 3,
+      }),
+      token(0, 9, ",", ",", {
+        indent: 4,
+        parentType: "inline_object",
+        tokenIndex: 1,
+        scopeId: "array_42",
+        operatorCountOnLine: 3,
+      }),
+      token(0, 12, ":", ":", {
+        indent: 4,
+        parentType: "pair",
+        tokenIndex: 2,
+        scopeId: "array_42",
+        operatorCountOnLine: 3,
+      }),
+      // Line 1: { a: 100, b: 1 }
+      token(1, 6, ":", ":", {
+        indent: 4,
+        parentType: "pair",
+        tokenIndex: 0,
+        scopeId: "array_42",
+        operatorCountOnLine: 3,
+      }),
+      token(1, 11, ",", ",", {
+        indent: 4,
+        parentType: "inline_object",
+        tokenIndex: 1,
+        scopeId: "array_42",
+        operatorCountOnLine: 3,
+      }),
+      token(1, 14, ":", ":", {
+        indent: 4,
+        parentType: "pair",
+        tokenIndex: 2,
+        scopeId: "array_42",
+        operatorCountOnLine: 3,
+      }),
+    ];
+
+    const groups = groupTokens(tokens);
+
+    // Should form 3 groups: 2 for colons, 1 for commas
+    assert.strictEqual(groups.length, 3);
+
+    // All groups should have 2 tokens (one per line)
+    groups.forEach((g) => {
+      assert.strictEqual(g.tokens.length, 2);
+    });
+  });
+});
+
+/**
+ * Inline Object Comma Detection Tests
+ *
+ * Tests to verify that inline object comma detection works correctly.
+ */
+suite("Inline Object Comma Detection Tests", () => {
+  // Simulate the findInlineObjectCommas and findCommaBetween logic
+  function findCommaBetween(
+    line: string,
+    startCol: number,
+    endCol: number,
+  ): number | null {
+    let inString = false;
+    let stringChar = "";
+    let escaped = false;
+    let depth = 0;
+
+    for (let i = startCol; i < endCol && i < line.length; i++) {
+      const char = line[i];
+
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+
+      if (char === "\\" && inString) {
+        escaped = true;
+        continue;
+      }
+
+      if ((char === '"' || char === "'" || char === "`") && !inString) {
+        inString = true;
+        stringChar = char;
+        continue;
+      }
+
+      if (char === stringChar && inString) {
+        inString = false;
+        stringChar = "";
+        continue;
+      }
+
+      if (inString) continue;
+
+      if (char === "{" || char === "[" || char === "(") {
+        depth++;
+        continue;
+      }
+      if (char === "}" || char === "]" || char === ")") {
+        depth--;
+        continue;
+      }
+
+      if (char === "," && depth === 0) {
+        return i;
+      }
+    }
+
+    return null;
+  }
+
+  function findInlineObjectCommas(
+    lineText: string,
+    colons: { column: number }[],
+  ): number[] {
+    const commaPositions: number[] = [];
+    const sortedColons = [...colons].sort((a, b) => a.column - b.column);
+
+    for (let i = 0; i < sortedColons.length - 1; i++) {
+      const currentColonCol = sortedColons[i].column;
+      const nextColonCol = sortedColons[i + 1].column;
+
+      const commaCol = findCommaBetween(
+        lineText,
+        currentColonCol + 1,
+        nextColonCol,
+      );
+      if (commaCol !== null) {
+        commaPositions.push(commaCol);
+      }
+    }
+
+    return commaPositions;
+  }
+
+  test("detects comma between two colons in inline object", () => {
+    const line = '  { groupName: "key", elementNamePattern: "^key$" },';
+    const colons = [{ column: 13 }, { column: 41 }]; // positions of the two colons
+
+    const commas = findInlineObjectCommas(line, colons);
+
+    // Should find one comma at position 20 (after "key")
+    assert.strictEqual(commas.length, 1);
+    assert.strictEqual(line[commas[0]], ",");
+  });
+
+  test("handles multiple inline objects on different lines", () => {
+    const lines = [
+      '  { groupName: "key",       elementNamePattern: "^key$" },',
+      '  { groupName: "ref",       elementNamePattern: "^ref$" },',
+      '  { groupName: "className", elementNamePattern: "^className$" },',
+    ];
+
+    // Find colon positions for each line
+    const colonPositions = lines.map((line) => {
+      const positions: number[] = [];
+      let inString = false;
+      for (let i = 0; i < line.length; i++) {
+        if (line[i] === '"') inString = !inString;
+        if (line[i] === ":" && !inString) positions.push(i);
+      }
+      return positions;
+    });
+
+    // Find commas for each line
+    const commasPerLine = lines.map((line, idx) => {
+      const colons = colonPositions[idx].map((col) => ({ column: col }));
+      return findInlineObjectCommas(line, colons);
+    });
+
+    // Each line should have exactly 1 comma
+    commasPerLine.forEach((commas, lineIdx) => {
+      assert.strictEqual(
+        commas.length,
+        1,
+        `Line ${lineIdx} should have 1 comma, got ${commas.length}`,
+      );
+    });
+  });
+
+  test("grouping works with array scope and varying value lengths", () => {
+    // This simulates what the parser SHOULD produce for the customGroups array
+    // The key insight: all tokens should share the same array scopeId
+    const tokens: AlignmentToken[] = [
+      // Line 0: { groupName: "key", elementNamePattern: "^key$" }
+      // "key" is short, comma at col 20
+      token(0, 13, ":", ":", {
+        indent: 4,
+        parentType: "pair",
+        tokenIndex: 0,
+        scopeId: "array_100",
+        operatorCountOnLine: 3,
+      }),
+      token(0, 20, ",", ",", {
+        indent: 4,
+        parentType: "inline_object",
+        tokenIndex: 1,
+        scopeId: "array_100",
+        operatorCountOnLine: 3,
+      }),
+      token(0, 41, ":", ":", {
+        indent: 4,
+        parentType: "pair",
+        tokenIndex: 2,
+        scopeId: "array_100",
+        operatorCountOnLine: 3,
+      }),
+      // Line 1: { groupName: "ref", elementNamePattern: "^ref$" }
+      // "ref" is short, comma at col 20
+      token(1, 13, ":", ":", {
+        indent: 4,
+        parentType: "pair",
+        tokenIndex: 0,
+        scopeId: "array_100", // SAME array scope!
+        operatorCountOnLine: 3,
+      }),
+      token(1, 20, ",", ",", {
+        indent: 4,
+        parentType: "inline_object",
+        tokenIndex: 1,
+        scopeId: "array_100",
+        operatorCountOnLine: 3,
+      }),
+      token(1, 41, ":", ":", {
+        indent: 4,
+        parentType: "pair",
+        tokenIndex: 2,
+        scopeId: "array_100",
+        operatorCountOnLine: 3,
+      }),
+      // Line 2: { groupName: "className", elementNamePattern: "^className$" }
+      // "className" is long, comma at col 26
+      token(2, 13, ":", ":", {
+        indent: 4,
+        parentType: "pair",
+        tokenIndex: 0,
+        scopeId: "array_100",
+        operatorCountOnLine: 3,
+      }),
+      token(2, 26, ",", ",", {
+        indent: 4,
+        parentType: "inline_object",
+        tokenIndex: 1,
+        scopeId: "array_100",
+        operatorCountOnLine: 3,
+      }),
+      token(2, 53, ":", ":", {
+        indent: 4,
+        parentType: "pair",
+        tokenIndex: 2,
+        scopeId: "array_100",
+        operatorCountOnLine: 3,
+      }),
+    ];
+
+    const groups = groupTokens(tokens);
+
+    // Should have 3 groups: first colons, commas, second colons
+    assert.strictEqual(groups.length, 3, "Should have 3 groups");
+
+    // First colons (tokenIndex 0)
+    const firstColons = groups.find(
+      (g) => g.tokens[0].type === ":" && g.tokens[0].tokenIndex === 0,
+    );
+    assert.ok(firstColons, "Should have first colons group");
+    assert.strictEqual(firstColons!.tokens.length, 3);
+    // All at column 13, so target = 14 (padAfter)
+    assert.strictEqual(firstColons!.targetColumn, 14);
+
+    // Commas (tokenIndex 1)
+    const commas = groups.find((g) => g.tokens[0].type === ",");
+    assert.ok(commas, "Should have commas group");
+    assert.strictEqual(commas!.tokens.length, 3);
+    // Commas at 20, 20, 26 - max end = 27
+    assert.strictEqual(commas!.targetColumn, 27);
+
+    // Second colons (tokenIndex 2)
+    const secondColons = groups.find(
+      (g) => g.tokens[0].type === ":" && g.tokens[0].tokenIndex === 2,
+    );
+    assert.ok(secondColons, "Should have second colons group");
+    assert.strictEqual(secondColons!.tokens.length, 3);
+    // Colons at 41, 41, 53 - max end = 54
+    assert.strictEqual(secondColons!.targetColumn, 54);
+  });
+
+  test("BUG REPRO: different scopeIds prevent alignment", () => {
+    // This is likely what's happening in the real parser:
+    // Each inline object gets its own scopeId instead of the array's scopeId
+    const tokens: AlignmentToken[] = [
+      // Line 0: object_1
+      token(0, 13, ":", ":", {
+        indent: 4,
+        parentType: "pair",
+        tokenIndex: 0,
+        scopeId: "object_1", // BUG: should be array scope
+        operatorCountOnLine: 3,
+      }),
+      token(0, 20, ",", ",", {
+        indent: 4,
+        parentType: "inline_object",
+        tokenIndex: 1,
+        scopeId: "object_1",
+        operatorCountOnLine: 3,
+      }),
+      token(0, 41, ":", ":", {
+        indent: 4,
+        parentType: "pair",
+        tokenIndex: 2,
+        scopeId: "object_1",
+        operatorCountOnLine: 3,
+      }),
+      // Line 1: object_2 (DIFFERENT scope!)
+      token(1, 13, ":", ":", {
+        indent: 4,
+        parentType: "pair",
+        tokenIndex: 0,
+        scopeId: "object_2", // BUG: different scope!
+        operatorCountOnLine: 3,
+      }),
+      token(1, 20, ",", ",", {
+        indent: 4,
+        parentType: "inline_object",
+        tokenIndex: 1,
+        scopeId: "object_2",
+        operatorCountOnLine: 3,
+      }),
+      token(1, 41, ":", ":", {
+        indent: 4,
+        parentType: "pair",
+        tokenIndex: 2,
+        scopeId: "object_2",
+        operatorCountOnLine: 3,
+      }),
+    ];
+
+    const groups = groupTokens(tokens);
+
+    // With different scopeIds, NO groups should form
+    // (each token is alone in its scope, can't form a group with just 1)
+    assert.strictEqual(
+      groups.length,
+      0,
+      "BUG CONFIRMED: Different scopeIds prevent grouping",
+    );
+  });
+});
+
 /**
  * Parser Integration Tests
  *
