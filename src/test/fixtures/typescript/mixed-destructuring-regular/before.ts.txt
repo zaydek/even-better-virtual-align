@@ -1,0 +1,4 @@
+const [foo, bar] = something;
+const ref = somethingElse;
+const { x, y } = point;
+const value = 42;

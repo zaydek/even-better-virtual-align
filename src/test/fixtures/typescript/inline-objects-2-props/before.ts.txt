@@ -1,0 +1,5 @@
+const items = [
+  { id: 1, name: "Alice" },
+  { id: 2, name: "Bob" },
+  { id: 100, name: "Charlie" },
+];

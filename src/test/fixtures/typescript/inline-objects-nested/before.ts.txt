@@ -1,0 +1,5 @@
+const routes = [
+  { path: "/", component: Home, meta: { auth: false } },
+  { path: "/dashboard", component: Dashboard, meta: { auth: true } },
+  { path: "/settings", component: Settings, meta: { auth: true } },
+];
