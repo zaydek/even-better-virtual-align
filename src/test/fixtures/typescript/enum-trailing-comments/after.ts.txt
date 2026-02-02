@@ -1,5 +1,5 @@
 export enum EnumFileStatus {
   Uploading = "uploading", // File is currently being uploaded
-  Complete ·= "complete", ··// File upload finished successfully
-  Error ····= "error", ········// File upload failed
+  Complete ·= "complete", ·// File upload finished successfully
+  Error ····= "error", ····// File upload failed
 }

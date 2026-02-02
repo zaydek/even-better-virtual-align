@@ -296,14 +296,31 @@ export class ParserService {
       });
 
       // Find inline objects and add comma tokens
-      // Group captures by line to detect lines with multiple colons from pairs
-      const colonsByLine = new Map<number, CaptureData[]>();
+      // Group captures by line AND DEPTH to handle nested objects separately
+      // Each depth level gets its own alignment scope
+      const colonsByLineAndDepth = new Map<string, CaptureData[]>();
       for (const data of captureData) {
         if (data.type === ":" && data.parentType === "pair") {
-          if (!colonsByLine.has(data.line)) {
-            colonsByLine.set(data.line, []);
+          const lineText = document.lineAt(data.line).text;
+          const braceDepth = this.getBraceDepthAtColumn(lineText, data.column);
+          
+          // Group by line AND depth
+          const key = `${data.line}:${braceDepth}`;
+          if (!colonsByLineAndDepth.has(key)) {
+            colonsByLineAndDepth.set(key, []);
           }
-          colonsByLine.get(data.line)!.push(data);
+          colonsByLineAndDepth.get(key)!.push(data);
+        }
+      }
+      
+      // Also maintain colonsByLine for backward compatibility (outer objects only)
+      const colonsByLine = new Map<number, CaptureData[]>();
+      for (const [key, colons] of colonsByLineAndDepth) {
+        const [lineStr, depthStr] = key.split(":");
+        const line = parseInt(lineStr);
+        const depth = parseInt(depthStr);
+        if (depth === 1) {
+          colonsByLine.set(line, colons);
         }
       }
 
@@ -325,29 +342,91 @@ export class ParserService {
         }
       }
 
-      for (const [lineNum, colons] of colonsByLine) {
+      // Track which lines have inline objects at each depth
+      const inlineObjectLineDepths = new Set<string>();
+
+      // Process ALL depth levels, not just depth 1
+      for (const [key, colons] of colonsByLineAndDepth) {
         if (colons.length < 2) continue;
+
+        const [lineStr, depthStr] = key.split(":");
+        const lineNum = parseInt(lineStr);
+        const depth = parseInt(depthStr);
+
+        inlineObjectLineDepths.add(key);
 
         // DEBUG: Write to file
         fs.appendFileSync(
           debugPath,
-          `INLINE L${lineNum}: ${colons.length} colons, scope="${colons[0].scopeId}"\n`,
+          `INLINE L${lineNum} D${depth}: ${colons.length} colons, scope="${colons[0].scopeId}"\n`,
         );
 
-        // This is an inline object - find commas between pairs
         const lineText = document.lineAt(lineNum).text;
-        const commaPositions = this.findInlineObjectCommas(lineText, colons);
+        
+        // Create depth-specific scope for proper grouping
+        const depthScopeId = `${colons[0].scopeId}_depth${depth}`;
 
-        for (const commaCol of commaPositions) {
+        // For depth 1 (outermost objects): find commas between pairs
+        if (depth === 1) {
+          const commaPositions = this.findInlineObjectCommas(lineText, colons);
+
+          for (const commaCol of commaPositions) {
+            captureData.push({
+              line: lineNum,
+              column: commaCol,
+              text: ",",
+              type: ",",
+              indent: colons[0].indent,
+              parentType: "inline_object",
+              scopeId: depthScopeId,
+            });
+          }
+        }
+
+        // Find closing brace for this depth level
+        const closingBraceCol = this.findClosingBraceAtDepth(lineText, colons, depth);
+        if (closingBraceCol !== null) {
           captureData.push({
             line: lineNum,
-            column: commaCol,
-            text: ",",
-            type: ",",
+            column: closingBraceCol,
+            text: "}",
+            type: "}",
             indent: colons[0].indent,
-            parentType: "inline_object", // Special parent type for inline object commas
-            scopeId: colons[0].scopeId, // Inherit scope from the colons
+            parentType: depth === 1 ? "inline_object" : "inline_object_nested",
+            scopeId: depthScopeId,
           });
+        }
+      }
+
+      // For inline objects with } alignment, handle colons specially:
+      // - Depth 1 (outer object): first colon aligns, other colons get 1 dot minimum
+      // - Depth 2+ (nested objects): ALL colons get NO padding (only } aligns)
+      // 
+      // Also: mark ALL colons at depth 2+ as nested (even if not part of inline object detection)
+      // This prevents nested object colons from being grouped with outer colons
+      for (const data of captureData) {
+        if (data.type !== ":") continue;
+        const lineText = document.lineAt(data.line).text;
+        const depth = this.getBraceDepthAtColumn(lineText, data.column);
+        
+        if (depth >= 2) {
+          // ALL colons at depth 2+ are nested - mark them to skip alignment
+          data.parentType = "inline_object_nested_colon";
+          data.scopeId = `${data.scopeId}_depth${depth}_no_align`;
+          continue;
+        }
+        
+        // Depth 1: check if this line has inline objects
+        const key = `${data.line}:${depth}`;
+        if (!inlineObjectLineDepths.has(key)) continue;
+        
+        // Outer object colons: first aligns, others get minimum spacing
+        const depthColons = colonsByLineAndDepth.get(key);
+        if (!depthColons) continue;
+        const minColonCol = Math.min(...depthColons.map((c) => c.column));
+        if (data.column !== minColonCol) {
+          data.parentType = "inline_object_colon_min";
+          data.scopeId = `${data.scopeId}_depth${depth}`;
         }
       }
 
@@ -1310,6 +1389,147 @@ export class ParserService {
     }
 
     return commaPositions;
+  }
+
+  /**
+   * Calculates the brace depth at a given column in a line.
+   * Returns 0 if outside all braces, 1 if inside first brace, 2+ if nested.
+   * Handles strings properly.
+   */
+  private getBraceDepthAtColumn(lineText: string, targetColumn: number): number {
+    let depth = 0;
+    let inString = false;
+    let stringChar = "";
+    let escaped = false;
+
+    for (let i = 0; i < targetColumn && i < lineText.length; i++) {
+      const char = lineText[i];
+
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+
+      if (char === "\\" && inString) {
+        escaped = true;
+        continue;
+      }
+
+      if ((char === '"' || char === "'" || char === "`") && !inString) {
+        inString = true;
+        stringChar = char;
+        continue;
+      }
+
+      if (char === stringChar && inString) {
+        inString = false;
+        stringChar = "";
+        continue;
+      }
+
+      if (inString) continue;
+
+      if (char === "{") {
+        depth++;
+      } else if (char === "}") {
+        depth--;
+      }
+    }
+
+    return depth;
+  }
+
+  /**
+   * Finds the closing brace position for a specific depth level.
+   * Returns the column RIGHT AFTER the last value, before any trailing whitespace/}.
+   * This allows padding to be inserted between the value and the closing brace.
+   *
+   * @param lineText - The full line text
+   * @param colons - Colons at this depth level
+   * @param targetDepth - The depth level (1 = outermost, 2 = first nested, etc.)
+   */
+  private findClosingBraceAtDepth(
+    lineText: string,
+    colons: { column: number }[],
+    targetDepth: number,
+  ): number | null {
+    // Find the rightmost colon at this depth
+    const rightmostColonCol = Math.max(...colons.map((c) => c.column));
+
+    // Find the } that closes this depth level
+    // Start from rightmost colon and track depth relative to our target
+    let closingBraceCol = -1;
+    let inString = false;
+    let stringChar = "";
+    let escaped = false;
+    let currentDepth = targetDepth; // We're at targetDepth at the colon position
+
+    for (let i = rightmostColonCol + 1; i < lineText.length; i++) {
+      const char = lineText[i];
+
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+
+      if (char === "\\" && inString) {
+        escaped = true;
+        continue;
+      }
+
+      if ((char === '"' || char === "'" || char === "`") && !inString) {
+        inString = true;
+        stringChar = char;
+        continue;
+      }
+
+      if (char === stringChar && inString) {
+        inString = false;
+        stringChar = "";
+        continue;
+      }
+
+      if (inString) continue;
+
+      if (char === "{") {
+        currentDepth++;
+        continue;
+      }
+
+      if (char === "}") {
+        currentDepth--;
+        if (currentDepth === targetDepth - 1) {
+          // This } closes our target depth level
+          closingBraceCol = i;
+          break;
+        }
+      }
+    }
+
+    if (closingBraceCol === -1) {
+      return null;
+    }
+
+    // Now find the last non-whitespace character before the }
+    // We want to insert padding AFTER that character
+    let lastNonWhitespace = closingBraceCol - 1;
+    while (lastNonWhitespace > rightmostColonCol && /\s/.test(lineText[lastNonWhitespace])) {
+      lastNonWhitespace--;
+    }
+
+    // Return the position AFTER the last non-whitespace character
+    // This is where padding should be inserted
+    return lastNonWhitespace + 1;
+  }
+
+  /**
+   * Legacy wrapper for findClosingBraceAtDepth at depth 1.
+   */
+  private findInlineObjectClosingBrace(
+    lineText: string,
+    colons: { column: number }[],
+  ): number | null {
+    return this.findClosingBraceAtDepth(lineText, colons, 1);
   }
 
   /**

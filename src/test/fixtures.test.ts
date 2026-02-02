@@ -94,52 +94,100 @@ function findFixtureFiles(
 /**
  * Apply alignment groups to source lines to produce visual output.
  * Uses · to represent virtual padding spaces.
+ *
+ * This accounts for cumulative shift: earlier padding on a line shifts
+ * later operators, so we recalculate target columns using visual positions.
  */
 function applyAlignment(
   sourceLines: string[],
   groups: ReturnType<typeof groupTokens>
 ): string[] {
-  // Track padding to add at each (line, column) position
-  const paddingMap = new Map<string, number>();
+  // Sort groups by their first token's position (line, then column)
+  // This ensures we process earlier tokens first
+  const sortedGroups = [...groups].sort((a, b) => {
+    if (a.tokens[0].line !== b.tokens[0].line) {
+      return a.tokens[0].line - b.tokens[0].line;
+    }
+    return a.tokens[0].column - b.tokens[0].column;
+  });
 
-  for (const group of groups) {
+  // Track cumulative shift per line (padding added so far)
+  const lineShift = new Map<number, number>();
+
+  // Collect all padding operations
+  const paddingOps: Array<{ line: number; column: number; spaces: number }> = [];
+
+  for (const group of sortedGroups) {
+    // Recalculate targetColumn based on VISUAL positions (accounting for shift)
+    let visualTargetColumn: number;
+
+    // Special case: single-token groups (like inline_object_colon_min)
+    // Use the group's targetColumn directly, adjusted for shift
+    if (group.tokens.length === 1) {
+      const token = group.tokens[0];
+      const shift = lineShift.get(token.line) ?? 0;
+      // The group's targetColumn already includes the desired padding
+      // Just adjust for any previous shifts on this line
+      if (group.padAfter) {
+        const originalEndColumn = token.column + token.text.length;
+        const originalPadding = group.targetColumn - originalEndColumn;
+        visualTargetColumn = originalEndColumn + shift + originalPadding;
+      } else {
+        const originalPadding = group.targetColumn - token.column;
+        visualTargetColumn = token.column + shift + originalPadding;
+      }
+    } else if (group.padAfter) {
+      // For padAfter, target is max visual end position
+      visualTargetColumn = Math.max(
+        ...group.tokens.map((t) => {
+          const shift = lineShift.get(t.line) ?? 0;
+          return t.column + t.text.length + shift;
+        })
+      );
+    } else {
+      // For padBefore, target is max visual start position
+      visualTargetColumn = Math.max(
+        ...group.tokens.map((t) => {
+          const shift = lineShift.get(t.line) ?? 0;
+          return t.column + shift;
+        })
+      );
+    }
+
     for (const token of group.tokens) {
+      const shift = lineShift.get(token.line) ?? 0;
       let spacesNeeded: number;
       let insertColumn: number;
 
       if (group.padAfter) {
         // Pad after the token
-        const endColumn = token.column + token.text.length;
-        spacesNeeded = group.targetColumn - endColumn;
-        insertColumn = endColumn;
+        const visualEndColumn = token.column + token.text.length + shift;
+        spacesNeeded = visualTargetColumn - visualEndColumn;
+        insertColumn = token.column + token.text.length;
       } else {
         // Pad before the token
-        spacesNeeded = group.targetColumn - token.column;
+        const visualColumn = token.column + shift;
+        spacesNeeded = visualTargetColumn - visualColumn;
         insertColumn = token.column;
       }
 
       if (spacesNeeded > 0) {
-        const key = `${token.line}:${insertColumn}`;
-        const existing = paddingMap.get(key) ?? 0;
-        paddingMap.set(key, Math.max(existing, spacesNeeded));
+        paddingOps.push({ line: token.line, column: insertColumn, spaces: spacesNeeded });
+        // Update shift for this line
+        lineShift.set(token.line, (lineShift.get(token.line) ?? 0) + spacesNeeded);
       }
     }
   }
 
-  // Apply padding to each line
+  // Apply padding to each line (right to left to preserve column positions)
   const result: string[] = [];
   for (let lineIdx = 0; lineIdx < sourceLines.length; lineIdx++) {
     let line = sourceLines[lineIdx];
 
-    // Collect all padding for this line, sorted by column (descending)
-    const linePaddings: Array<{ column: number; spaces: number }> = [];
-    for (const [key, spaces] of paddingMap) {
-      const [l, c] = key.split(":").map(Number);
-      if (l === lineIdx) {
-        linePaddings.push({ column: c, spaces });
-      }
-    }
-    linePaddings.sort((a, b) => b.column - a.column);
+    // Collect padding for this line, sorted by column descending
+    const linePaddings = paddingOps
+      .filter((op) => op.line === lineIdx)
+      .sort((a, b) => b.column - a.column);
 
     // Insert padding (from right to left)
     for (const { column, spaces } of linePaddings) {

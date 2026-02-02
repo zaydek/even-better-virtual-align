@@ -8,6 +8,7 @@ export type OperatorType =
   | "="
   | ":"
   | ","
+  | "}"
   | "&&"
   | "||"
   | "and"

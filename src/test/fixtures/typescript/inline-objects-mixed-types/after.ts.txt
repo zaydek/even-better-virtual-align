@@ -1,5 +1,5 @@
 const config = [
-  { key: "theme",··· value:··· "dark",····· enabled:····· true },
-  { key: "fontSize", value: 14,······ enabled:······ false },
-  { key: "autoSave", value: "always", enabled: true },
+  { key: "theme",··· value:· "dark",· enabled:· true },
+  { key: "fontSize", value:· 14,······ enabled:· false },
+  { key: "autoSave", value:· "always", enabled:· true· },
 ];

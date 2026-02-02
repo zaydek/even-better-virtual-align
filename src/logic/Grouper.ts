@@ -31,6 +31,11 @@ export function groupTokens(tokens: AlignmentToken[]): AlignmentGroup[] {
   const buckets = new Map<string, AlignmentToken[]>();
 
   for (const token of tokens) {
+    // Skip tokens that should not be aligned
+    if (token.parentType === "inline_object_nested_colon") {
+      continue; // Nested object colons get no padding
+    }
+
     let key: string;
 
     // Check if this token is in an array scope (for array sibling alignment)
@@ -42,6 +47,11 @@ export function groupTokens(tokens: AlignmentToken[]): AlignmentGroup[] {
       // Ignore tokenIndex - comments should align regardless of how many
       // operators precede them on the line
       key = `${token.type}|${token.indent}|${token.parentType}|${token.scopeId}`;
+    } else if (token.parentType === "inline_object_colon_min") {
+      // Minimum spacing colons in inline objects: isolate EACH colon individually
+      // Each colon gets its own group, ensuring exactly 1 space padding
+      // (no alignment at all for these colons - just fixed 1 space)
+      key = `${token.type}|${token.indent}|${token.parentType}|line_${token.line}|col_${token.column}`;
     } else if (token.tokenIndex === 0) {
       // First operator on line: group broadly
       key = `${token.type}|${token.indent}|${token.parentType}|${token.tokenIndex}|${token.scopeId}`;
@@ -72,6 +82,13 @@ export function groupTokens(tokens: AlignmentToken[]): AlignmentGroup[] {
 
   // For each bucket, find consecutive line sequences
   for (const bucket of buckets.values()) {
+    // Special case: inline_object_colon_min buckets can be single tokens
+    // Each gets exactly 1 space padding, no alignment needed
+    if (bucket.length === 1 && bucket[0].parentType === "inline_object_colon_min") {
+      groups.push(createGroup(bucket));
+      continue;
+    }
+    
     if (bucket.length < 2) continue;
 
     // Sort by line number
@@ -123,18 +140,37 @@ export function groupTokens(tokens: AlignmentToken[]): AlignmentGroup[] {
  *   { key: "short",   next: 1 }  <- comma padded to align next key
  *   { key: "longer",  next: 1 }
  *
- * For `=`, `&&`, `||` operators: Pad BEFORE the operator so OPERATORS align.
+ * For `=`, `&&`, `||`, `}` operators: Pad BEFORE the operator so OPERATORS align.
  *   passes   = sum(...)  <- operator at column 9
  *   warnings = sum(...)  <- operator at column 9
+ *   { id: 1,   name: "Alice"   }  <- } aligns by padding before
+ *   { id: 100, name: "Charlie" }
  *
  * For `funcArg` (function argument values): Pad BEFORE so values RIGHT-align.
  *   token(0,  8, ...)  <- 8 gets 1 space before to align with 15
  *   token(0, 15, ...)  <- 15 at rightmost position
+ *
+ * For `inline_object_colon_min`: Always adds exactly 1 space after each colon.
+ *   { id: 1, name:· "Alice" }  <- 1 space padding after second colon
  */
 function createGroup(tokens: AlignmentToken[]): AlignmentGroup {
   const operatorType = tokens[0].type;
+  const parentType = tokens[0].parentType;
+
+  // Special case: inline_object_colon_min gets exactly 1 space padding each
+  // Each token is in its own group, so targetColumn = this token's end + 1
+  if (parentType === "inline_object_colon_min") {
+    const token = tokens[0]; // Should be exactly 1 token
+    return {
+      id: `${token.line}-${token.column}-${token.type}`,
+      tokens,
+      targetColumn: token.column + token.text.length + 1,
+      padAfter: true,
+    };
+  }
 
   // `:` and `,` pad after (values/next keys align), everything else pads before (operators align)
+  // `}` pads before to align closing braces of inline objects
   const padAfter = operatorType === ":" || operatorType === ",";
 
   let targetColumn: number;

@@ -1,5 +1,5 @@
 enum Status {
   Uploading = "uploading", // File is being uploaded
-  Complete ·= "complete", ··// Upload finished
-  Error ····= "error", ········// Upload failed
+  Complete ·= "complete", ·// Upload finished
+  Error ····= "error", ····// Upload failed
 }

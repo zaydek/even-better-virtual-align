@@ -1,8 +1,8 @@
 const config = {
   customGroups: [
-    { groupName: "key",······ elementNamePattern:······ "^key$" },
-    { groupName: "ref",······ elementNamePattern:······ "^ref$" },
-    { groupName: "id",······· elementNamePattern:······· "^id$" },
-    { groupName: "className", elementNamePattern: "^className$" },
+    { groupName: "key",······ elementNamePattern:· "^key$"····· },
+    { groupName: "ref",······ elementNamePattern:· "^ref$"······ },
+    { groupName: "id",······· elementNamePattern:· "^id$"······· },
+    { groupName: "className", elementNamePattern:· "^className$" },
   ],
 };

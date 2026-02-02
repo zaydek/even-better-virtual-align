@@ -1,5 +1,5 @@
 export type FileState = {
-  name:···· string; ··········// Filename displayed to user
-  progress: number; ······// Upload progress from 0 to 100
+  name:···· string; ········// Filename displayed to user
+  progress: number; ········// Upload progress from 0 to 100
   status:·· EnumFileStatus; // Current upload status
 };
