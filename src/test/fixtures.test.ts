@@ -2,14 +2,13 @@
  * Fixture-based declarative tests - Uses real parser.
  *
  * Each fixture folder contains a pair of files:
- * - input.{lang}: Source code with syntax highlighting (e.g., input.ts, input.json)
- * - expected.{lang}.txt: Expected alignment output with · for padding
+ * - before.{lang}.txt: Source code before alignment (e.g., before.ts.txt)
+ * - after.{lang}.txt: Expected alignment output with · for padding
  *
- * The language is extracted from the input filename extension.
- * Input files use real extensions for syntax highlighting.
- * Expected files use .txt to avoid editor errors from · characters.
+ * The language is extracted from the filename (before.ts.txt → typescript).
+ * Both files use .txt to keep Prettier/ESLint from modifying them.
  *
- * Run with UPDATE_SNAPSHOTS=1 to auto-generate expected files:
+ * Run with UPDATE_SNAPSHOTS=1 to auto-generate after files:
  *   UPDATE_SNAPSHOTS=1 npm test
  */
 
@@ -50,32 +49,32 @@ const EXT_TO_LANG: Record<string, string> = {
 };
 
 /**
- * Find input/expected file pair in a fixture directory.
- * Input: input.{lang} (e.g., input.ts) - real extension for syntax highlighting
- * Expected: expected.{lang}.txt (e.g., expected.ts.txt) - .txt to avoid editor errors
+ * Find before/after file pair in a fixture directory.
+ * Before: before.{lang}.txt (e.g., before.ts.txt) - source code
+ * After: after.{lang}.txt (e.g., after.ts.txt) - expected alignment with · padding
  *
- * Returns { inputPath, expectedPath, languageId } or null if not found.
+ * Returns { beforePath, afterPath, languageId } or null if not found.
  */
 function findFixtureFiles(
   dir: string
-): { inputPath: string; expectedPath: string; languageId: string } | null {
+): { beforePath: string; afterPath: string; languageId: string } | null {
   const files = fs.readdirSync(dir);
 
-  // Look for input.{lang} pattern (no .txt suffix for syntax highlighting)
+  // Look for before.{lang}.txt pattern
   for (const file of files) {
-    const match = file.match(/^input\.(\w+)$/);
+    const match = file.match(/^before\.(\w+)\.txt$/);
     if (match) {
       const ext = match[1];
-      const inputPath = path.join(dir, file);
-      const expectedFile = `expected.${ext}.txt`;
-      const expectedPath = path.join(dir, expectedFile);
+      const beforePath = path.join(dir, file);
+      const afterFile = `after.${ext}.txt`;
+      const afterPath = path.join(dir, afterFile);
 
-      // In UPDATE_SNAPSHOTS mode, expected file doesn't need to exist yet
-      if (fs.existsSync(expectedPath) || UPDATE_SNAPSHOTS) {
+      // In UPDATE_SNAPSHOTS mode, after file doesn't need to exist yet
+      if (fs.existsSync(afterPath) || UPDATE_SNAPSHOTS) {
         const languageId = EXT_TO_LANG[ext] || ext;
         return {
-          inputPath,
-          expectedPath,
+          beforePath,
+          afterPath,
           languageId,
         };
       }
@@ -153,14 +152,14 @@ function applyAlignment(
  */
 function collectFixtures(): Array<{
   dir: string;
-  inputPath: string;
-  expectedPath: string;
+  beforePath: string;
+  afterPath: string;
   languageId: string;
 }> {
   const fixtures: Array<{
     dir: string;
-    inputPath: string;
-    expectedPath: string;
+    beforePath: string;
+    afterPath: string;
     languageId: string;
   }> = [];
 
@@ -242,11 +241,12 @@ suite("Fixture Tests", () => {
     const fixtureName = path.relative(FIXTURES_DIR, fixture.dir);
 
     test(fixtureName, async () => {
-      const inputContent = fs.readFileSync(fixture.inputPath, "utf-8");
+      // Read before file and normalize line endings
+      const beforeContent = fs.readFileSync(fixture.beforePath, "utf-8").replace(/\r\n/g, "\n");
 
       // Create a virtual document
       const doc = await vscode.workspace.openTextDocument({
-        content: inputContent,
+        content: beforeContent,
         language: fixture.languageId,
       });
 
@@ -257,34 +257,30 @@ suite("Fixture Tests", () => {
       const groups = groupTokens(tokens);
 
       // Apply alignment to source
-      const sourceLines = inputContent.split("\n");
+      const sourceLines = beforeContent.split("\n");
       const actualLines = applyAlignment(sourceLines, groups);
       const actual = actualLines.join("\n");
 
-      // UPDATE_SNAPSHOTS mode: write actual to expected file
+      // UPDATE_SNAPSHOTS mode: write actual to after file
       if (UPDATE_SNAPSHOTS) {
-        fs.writeFileSync(fixture.expectedPath, actual);
-        console.log(`Updated snapshot: ${fixture.expectedPath}`);
+        fs.writeFileSync(fixture.afterPath, actual);
+        console.log(`Updated snapshot: ${fixture.afterPath}`);
         return;
       }
 
-      // Normal mode: compare to expected
-      if (!fs.existsSync(fixture.expectedPath)) {
+      // Normal mode: compare to after file
+      if (!fs.existsSync(fixture.afterPath)) {
         assert.fail(
           `Snapshot missing for ${fixtureName}. Run with UPDATE_SNAPSHOTS=1 to create.`
         );
       }
 
-      const expectedContent = fs.readFileSync(fixture.expectedPath, "utf-8");
-
-      // Normalize line endings for cross-platform compatibility
-      const normalizedActual = actual.replace(/\r\n/g, "\n");
-      const normalizedExpected = expectedContent.replace(/\r\n/g, "\n");
+      const afterContent = fs.readFileSync(fixture.afterPath, "utf-8").replace(/\r\n/g, "\n");
 
       assert.strictEqual(
-        normalizedActual,
-        normalizedExpected,
-        `Fixture ${fixtureName} failed.\n\nActual:\n${actual}\n\nExpected:\n${expectedContent}`
+        actual,
+        afterContent,
+        `Fixture ${fixtureName} failed.\n\nActual:\n${actual}\n\nExpected:\n${afterContent}`
       );
     });
   }
