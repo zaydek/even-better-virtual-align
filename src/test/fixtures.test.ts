@@ -115,7 +115,8 @@ function applyAlignment(
   const lineShift = new Map<number, number>();
 
   // Collect all padding operations
-  const paddingOps: Array<{ line: number; column: number; spaces: number }> = [];
+  const paddingOps: Array<{ line: number; column: number; spaces: number }> =
+    [];
 
   for (const group of sortedGroups) {
     // Recalculate targetColumn based on VISUAL positions (accounting for shift)
@@ -172,9 +173,16 @@ function applyAlignment(
       }
 
       if (spacesNeeded > 0) {
-        paddingOps.push({ line: token.line, column: insertColumn, spaces: spacesNeeded });
+        paddingOps.push({
+          line: token.line,
+          column: insertColumn,
+          spaces: spacesNeeded,
+        });
         // Update shift for this line
-        lineShift.set(token.line, (lineShift.get(token.line) ?? 0) + spacesNeeded);
+        lineShift.set(
+          token.line,
+          (lineShift.get(token.line) ?? 0) + spacesNeeded
+        );
       }
     }
   }

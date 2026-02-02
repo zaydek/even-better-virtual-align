@@ -383,27 +383,60 @@ export class ParserService {
           }
         }
 
-        // Find closing brace for this depth level
-        const closingBraceCol = this.findClosingBraceAtDepth(lineText, colons, depth);
-        if (closingBraceCol !== null) {
+        // Find closing brace for this depth level (only for depth 1 outer objects)
+        if (depth === 1) {
+          const closingBraceCol = this.findClosingBraceAtDepth(lineText, colons, depth);
+          if (closingBraceCol !== null) {
+            captureData.push({
+              line: lineNum,
+              column: closingBraceCol,
+              text: "}",
+              type: "}",
+              indent: colons[0].indent,
+              parentType: "inline_object",
+              scopeId: depthScopeId,
+            });
+          }
+        }
+      }
+
+      // Also emit } tokens for NESTED objects on inline object lines
+      // These are objects like { auth: false } that may only have 1 colon
+      // but should still have their } aligned across lines
+      for (const key of inlineObjectLineDepths) {
+        const [lineStr, depthStr] = key.split(":");
+        const lineNum = parseInt(lineStr);
+        const depth = parseInt(depthStr);
+        
+        // Only process depth 1 (outer objects) - we'll find nested } from there
+        if (depth !== 1) continue;
+        
+        const lineText = document.lineAt(lineNum).text;
+        const outerColons = colonsByLineAndDepth.get(key);
+        if (!outerColons) continue;
+        
+        // Find all nested objects on this line by looking for { } pairs at depth 2
+        const nestedBraces = this.findNestedObjectBraces(lineText, outerColons);
+        
+        for (const nestedBrace of nestedBraces) {
           captureData.push({
             line: lineNum,
-            column: closingBraceCol,
+            column: nestedBrace.insertCol,
             text: "}",
             type: "}",
-            indent: colons[0].indent,
-            parentType: depth === 1 ? "inline_object" : "inline_object_nested",
-            scopeId: depthScopeId,
+            indent: outerColons[0].indent,
+            parentType: "inline_object_nested",
+            scopeId: `${outerColons[0].scopeId}_nested_${nestedBrace.depth}`,
           });
         }
       }
 
       // For inline objects with } alignment, handle colons specially:
-      // - Depth 1 (outer object): first colon aligns, other colons get 1 dot minimum
+      // - Depth 1 (outer object): first colon aligns, OTHER colons get NO padding (skip them)
       // - Depth 2+ (nested objects): ALL colons get NO padding (only } aligns)
       // 
-      // Also: mark ALL colons at depth 2+ as nested (even if not part of inline object detection)
-      // This prevents nested object colons from being grouped with outer colons
+      // Mark ALL colons at depth 2+ as nested, AND non-first colons at depth 1
+      // This prevents secondary colons from interfering with alignment
       for (const data of captureData) {
         if (data.type !== ":") continue;
         const lineText = document.lineAt(data.line).text;
@@ -420,13 +453,14 @@ export class ParserService {
         const key = `${data.line}:${depth}`;
         if (!inlineObjectLineDepths.has(key)) continue;
         
-        // Outer object colons: first aligns, others get minimum spacing
+        // Outer object: first colon aligns, others get NO padding (skip them)
         const depthColons = colonsByLineAndDepth.get(key);
         if (!depthColons) continue;
         const minColonCol = Math.min(...depthColons.map((c) => c.column));
         if (data.column !== minColonCol) {
-          data.parentType = "inline_object_colon_min";
-          data.scopeId = `${data.scopeId}_depth${depth}`;
+          // Mark non-first colons to be skipped (no alignment, no min spacing)
+          data.parentType = "inline_object_secondary_colon";
+          data.scopeId = `${data.scopeId}_depth${depth}_no_align`;
         }
       }
 
@@ -1530,6 +1564,98 @@ export class ParserService {
     colons: { column: number }[],
   ): number | null {
     return this.findClosingBraceAtDepth(lineText, colons, 1);
+  }
+
+  /**
+   * Finds all nested object closing braces on a line.
+   * Returns insertion positions (after last value, before the nested }).
+   */
+  private findNestedObjectBraces(
+    lineText: string,
+    outerColons: { column: number }[],
+  ): Array<{ insertCol: number; depth: number }> {
+    const results: Array<{ insertCol: number; depth: number }> = [];
+    
+    // Scan the line for nested objects (depth 2+)
+    let inString = false;
+    let stringChar = "";
+    let escaped = false;
+    let depth = 0;
+    let nestedStart = -1; // Column where current nested object started
+    let lastNonWhitespace = -1;
+    
+    for (let i = 0; i < lineText.length; i++) {
+      const char = lineText[i];
+      
+      if (escaped) {
+        escaped = false;
+        if (depth >= 2 && !inString) {
+          lastNonWhitespace = i;
+        }
+        continue;
+      }
+      
+      if (char === "\\" && inString) {
+        escaped = true;
+        continue;
+      }
+      
+      if ((char === '"' || char === "'" || char === "`") && !inString) {
+        inString = true;
+        stringChar = char;
+        if (depth >= 2) {
+          lastNonWhitespace = i;
+        }
+        continue;
+      }
+      
+      if (char === stringChar && inString) {
+        inString = false;
+        stringChar = "";
+        if (depth >= 2) {
+          lastNonWhitespace = i;
+        }
+        continue;
+      }
+      
+      if (inString) {
+        if (depth >= 2) {
+          lastNonWhitespace = i;
+        }
+        continue;
+      }
+      
+      if (char === "{") {
+        depth++;
+        if (depth === 2) {
+          nestedStart = i;
+          lastNonWhitespace = -1; // Reset for this nested object
+        }
+        continue;
+      }
+      
+      if (char === "}") {
+        if (depth === 2 && nestedStart !== -1) {
+          // Found the end of a nested object
+          // insertCol should be right BEFORE the } for padding
+          // This gives "value ·}" instead of "value· }"
+          results.push({
+            insertCol: i,
+            depth: 2,
+          });
+          nestedStart = -1;
+        }
+        depth--;
+        continue;
+      }
+      
+      // Track last non-whitespace inside nested objects
+      if (depth >= 2 && !/\s/.test(char)) {
+        lastNonWhitespace = i;
+      }
+    }
+    
+    return results;
   }
 
   /**

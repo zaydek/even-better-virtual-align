@@ -35,6 +35,9 @@ export function groupTokens(tokens: AlignmentToken[]): AlignmentGroup[] {
     if (token.parentType === "inline_object_nested_colon") {
       continue; // Nested object colons get no padding
     }
+    if (token.parentType === "inline_object_secondary_colon") {
+      continue; // Secondary colons in inline objects get no padding
+    }
 
     let key: string;
 
@@ -84,11 +87,14 @@ export function groupTokens(tokens: AlignmentToken[]): AlignmentGroup[] {
   for (const bucket of buckets.values()) {
     // Special case: inline_object_colon_min buckets can be single tokens
     // Each gets exactly 1 space padding, no alignment needed
-    if (bucket.length === 1 && bucket[0].parentType === "inline_object_colon_min") {
+    if (
+      bucket.length === 1 &&
+      bucket[0].parentType === "inline_object_colon_min"
+    ) {
       groups.push(createGroup(bucket));
       continue;
     }
-    
+
     if (bucket.length < 2) continue;
 
     // Sort by line number
@@ -180,14 +186,14 @@ function createGroup(tokens: AlignmentToken[]): AlignmentGroup {
     // targetColumn = max end position (where the rightmost argument ends)
     // spacesNeeded = targetColumn - thisEndColumn (calculated in decorator)
     const maxEndColumn = Math.max(
-      ...tokens.map((t) => t.column + t.text.length),
+      ...tokens.map((t) => t.column + t.text.length)
     );
     targetColumn = maxEndColumn;
   } else if (padAfter) {
     // For `:`, find the rightmost position where an operator ENDS
     // Values should all start at the same column after this
     const maxEndColumn = Math.max(
-      ...tokens.map((t) => t.column + t.text.length),
+      ...tokens.map((t) => t.column + t.text.length)
     );
     targetColumn = maxEndColumn;
   } else {
@@ -210,7 +216,7 @@ function createGroup(tokens: AlignmentToken[]): AlignmentGroup {
 export function filterGroupsInRange(
   groups: AlignmentGroup[],
   startLine: number,
-  endLine: number,
+  endLine: number
 ): AlignmentGroup[] {
   return groups.filter((group) => {
     // Include if any token in the group is within the range
