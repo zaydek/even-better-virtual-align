@@ -5,5 +5,5 @@ CREATE TABLE wow_content (
     metadata JSONB  DEFAULT '{}'
 );
 
-CREATE INDEX idx_wow_path       ON wow_content USING GIST (path);
+CREATE INDEX idx_wow_path       ON wow_content USING GIST  (path);
 CREATE INDEX idx_wow_path_btree ON wow_content USING BTREE (path);

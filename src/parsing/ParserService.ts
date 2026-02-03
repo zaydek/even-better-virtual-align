@@ -54,7 +54,7 @@ export class ParserService {
         "node_modules",
         "@vscode",
         "tree-sitter-wasm",
-        "wasm",
+        "wasm"
       );
     }
     console.log("Even Better Virtual Align: WASM directory:", this.wasmDir);
@@ -84,7 +84,7 @@ export class ParserService {
           const fullPath = path.join(this.wasmDir, file);
           console.log(
             "Even Better Virtual Align: Loading WASM file:",
-            fullPath,
+            fullPath
           );
           return fullPath;
         },
@@ -93,12 +93,12 @@ export class ParserService {
       this.parser = new this.ParserClass();
       this.initialized = true;
       console.log(
-        "Even Better Virtual Align: Tree-sitter initialized successfully",
+        "Even Better Virtual Align: Tree-sitter initialized successfully"
       );
     } catch (error) {
       console.error(
         "Even Better Virtual Align: Failed to initialize Tree-sitter:",
-        error,
+        error
       );
       throw error;
     }
@@ -148,7 +148,7 @@ export class ParserService {
   async parse(
     document: vscode.TextDocument,
     startLine: number,
-    endLine: number,
+    endLine: number
   ): Promise<AlignmentToken[]> {
     if (!this.initialized) {
       await this.initialize();
@@ -308,7 +308,7 @@ export class ParserService {
         if (data.type === ":" && data.parentType === "pair") {
           const lineText = document.lineAt(data.line).text;
           const braceDepth = this.getBraceDepthAtColumn(lineText, data.column);
-          
+
           // Group by line AND depth
           const key = `${data.line}:${braceDepth}`;
           if (!colonsByLineAndDepth.has(key)) {
@@ -317,7 +317,7 @@ export class ParserService {
           colonsByLineAndDepth.get(key)!.push(data);
         }
       }
-      
+
       // Also maintain colonsByLine for backward compatibility (outer objects only)
       const colonsByLine = new Map<number, CaptureData[]>();
       for (const [key, colons] of colonsByLineAndDepth) {
@@ -334,7 +334,7 @@ export class ParserService {
       const debugPath = "/tmp/ebva-inline-debug.txt";
       fs.writeFileSync(
         debugPath,
-        `Extension running! captureData=${captureData.length}, colonsByLine entries=${colonsByLine.size}\n`,
+        `Extension running! captureData=${captureData.length}, colonsByLine entries=${colonsByLine.size}\n`
       );
 
       // Log all colons with their parentType
@@ -342,7 +342,7 @@ export class ParserService {
         if (data.type === ":") {
           fs.appendFileSync(
             debugPath,
-            `  L${data.line}:${data.column} parentType="${data.parentType}" scope="${data.scopeId}"\n`,
+            `  L${data.line}:${data.column} parentType="${data.parentType}" scope="${data.scopeId}"\n`
           );
         }
       }
@@ -363,11 +363,11 @@ export class ParserService {
         // DEBUG: Write to file
         fs.appendFileSync(
           debugPath,
-          `INLINE L${lineNum} D${depth}: ${colons.length} colons, scope="${colons[0].scopeId}"\n`,
+          `INLINE L${lineNum} D${depth}: ${colons.length} colons, scope="${colons[0].scopeId}"\n`
         );
 
         const lineText = document.lineAt(lineNum).text;
-        
+
         // Create depth-specific scope for proper grouping
         const depthScopeId = `${colons[0].scopeId}_depth${depth}`;
 
@@ -390,7 +390,11 @@ export class ParserService {
 
         // Find closing brace for this depth level (only for depth 1 outer objects)
         if (depth === 1) {
-          const closingBraceCol = this.findClosingBraceAtDepth(lineText, colons, depth);
+          const closingBraceCol = this.findClosingBraceAtDepth(
+            lineText,
+            colons,
+            depth
+          );
           if (closingBraceCol !== null) {
             captureData.push({
               line: lineNum,
@@ -412,17 +416,17 @@ export class ParserService {
         const [lineStr, depthStr] = key.split(":");
         const lineNum = parseInt(lineStr);
         const depth = parseInt(depthStr);
-        
+
         // Only process depth 1 (outer objects) - we'll find nested } from there
         if (depth !== 1) continue;
-        
+
         const lineText = document.lineAt(lineNum).text;
         const outerColons = colonsByLineAndDepth.get(key);
         if (!outerColons) continue;
-        
+
         // Find all nested objects on this line by looking for { } pairs at depth 2
         const nestedBraces = this.findNestedObjectBraces(lineText, outerColons);
-        
+
         for (const nestedBrace of nestedBraces) {
           captureData.push({
             line: lineNum,
@@ -439,25 +443,25 @@ export class ParserService {
       // For inline objects with } alignment, handle colons specially:
       // - Depth 1 (outer object): first colon aligns, OTHER colons get NO padding (skip them)
       // - Depth 2+ (nested objects): ALL colons get NO padding (only } aligns)
-      // 
+      //
       // Mark ALL colons at depth 2+ as nested, AND non-first colons at depth 1
       // This prevents secondary colons from interfering with alignment
       for (const data of captureData) {
         if (data.type !== ":") continue;
         const lineText = document.lineAt(data.line).text;
         const depth = this.getBraceDepthAtColumn(lineText, data.column);
-        
+
         if (depth >= 2) {
           // ALL colons at depth 2+ are nested - mark them to skip alignment
           data.parentType = "inline_object_nested_colon";
           data.scopeId = `${data.scopeId}_depth${depth}_no_align`;
           continue;
         }
-        
+
         // Depth 1: check if this line has inline objects
         const key = `${data.line}:${depth}`;
         if (!inlineObjectLineDepths.has(key)) continue;
-        
+
         // Outer object: first colon aligns, others get NO padding (skip them)
         const depthColons = colonsByLineAndDepth.get(key);
         if (!depthColons) continue;
@@ -646,7 +650,7 @@ export class ParserService {
   private parseJsonWithRegex(
     document: vscode.TextDocument,
     startLine: number,
-    endLine: number,
+    endLine: number
   ): AlignmentToken[] {
     const tokens: AlignmentToken[] = [];
 
@@ -744,7 +748,7 @@ export class ParserService {
   private parseYamlWithRegex(
     document: vscode.TextDocument,
     startLine: number,
-    endLine: number,
+    endLine: number
   ): AlignmentToken[] {
     const tokens: AlignmentToken[] = [];
     const tokenCountByLine: Map<number, number> = new Map();
@@ -850,7 +854,7 @@ export class ParserService {
   private parseSqlWithRegex(
     document: vscode.TextDocument,
     startLine: number,
-    endLine: number,
+    endLine: number
   ): AlignmentToken[] {
     const tokens: AlignmentToken[] = [];
     const text = document.getText();
@@ -869,7 +873,11 @@ export class ParserService {
     let createIndexStartLine = -1;
     let createIndexLines: Array<{ lineNum: number; lineText: string }> = [];
 
-    for (let lineNum = startLine; lineNum <= endLine && lineNum < lines.length; lineNum++) {
+    for (
+      let lineNum = startLine;
+      lineNum <= endLine && lineNum < lines.length;
+      lineNum++
+    ) {
       const lineText = lines[lineNum];
       const trimmed = lineText.trim();
       const upperTrimmed = trimmed.toUpperCase();
@@ -925,7 +933,10 @@ export class ParserService {
       }
 
       // Detect INSERT INTO
-      if (upperTrimmed.startsWith("INSERT INTO") || upperTrimmed.startsWith("INSERT ")) {
+      if (
+        upperTrimmed.startsWith("INSERT INTO") ||
+        upperTrimmed.startsWith("INSERT ")
+      ) {
         statementId++;
         inCreateTable = false;
         inInsertValues = upperTrimmed.includes("VALUES");
@@ -935,7 +946,10 @@ export class ParserService {
       }
 
       // Detect VALUES
-      if (upperTrimmed.startsWith("VALUES") || upperTrimmed.includes(") VALUES")) {
+      if (
+        upperTrimmed.startsWith("VALUES") ||
+        upperTrimmed.includes(") VALUES")
+      ) {
         inInsertValues = true;
         continue;
       }
@@ -957,20 +971,34 @@ export class ParserService {
       }
 
       // Detect WHERE
-      if (upperTrimmed.startsWith("WHERE") || upperTrimmed.startsWith("AND ") || upperTrimmed.startsWith("OR ")) {
+      if (
+        upperTrimmed.startsWith("WHERE") ||
+        upperTrimmed.startsWith("AND ") ||
+        upperTrimmed.startsWith("OR ")
+      ) {
         if (upperTrimmed.startsWith("WHERE")) {
           whereStartLine = lineNum;
         }
         inWhere = true;
         inSelectList = false;
         // Process this line for WHERE operators
-        this.parseSqlWhereOperators(lineText, lineNum, tokens, statementId, whereStartLine);
+        this.parseSqlWhereOperators(
+          lineText,
+          lineNum,
+          tokens,
+          statementId,
+          whereStartLine
+        );
         continue;
       }
 
       // Detect end of WHERE clause
-      if (upperTrimmed.startsWith("ORDER BY") || upperTrimmed.startsWith("GROUP BY") ||
-          upperTrimmed.startsWith("HAVING") || upperTrimmed.startsWith("LIMIT")) {
+      if (
+        upperTrimmed.startsWith("ORDER BY") ||
+        upperTrimmed.startsWith("GROUP BY") ||
+        upperTrimmed.startsWith("HAVING") ||
+        upperTrimmed.startsWith("LIMIT")
+      ) {
         inWhere = false;
       }
 
@@ -980,18 +1008,41 @@ export class ParserService {
       }
 
       // Process WHERE clause operators
-      if (inWhere && !upperTrimmed.startsWith("WHERE") && !upperTrimmed.startsWith("AND ") && !upperTrimmed.startsWith("OR ")) {
-        this.parseSqlWhereOperators(lineText, lineNum, tokens, statementId, whereStartLine);
+      if (
+        inWhere &&
+        !upperTrimmed.startsWith("WHERE") &&
+        !upperTrimmed.startsWith("AND ") &&
+        !upperTrimmed.startsWith("OR ")
+      ) {
+        this.parseSqlWhereOperators(
+          lineText,
+          lineNum,
+          tokens,
+          statementId,
+          whereStartLine
+        );
       }
 
       // End of statement
       if (trimmed.endsWith(";")) {
         if (inCreateTable) {
-          this.parseSqlCreateTableColumns(lines, createTableStartLine, lineNum, tokens, statementId);
+          this.parseSqlCreateTableColumns(
+            lines,
+            createTableStartLine,
+            lineNum,
+            tokens,
+            statementId
+          );
         }
         // Also check for WHERE on this line (e.g., "WHERE x = 1;")
         if (inWhere) {
-          this.parseSqlWhereOperators(lineText, lineNum, tokens, statementId, whereStartLine);
+          this.parseSqlWhereOperators(
+            lineText,
+            lineNum,
+            tokens,
+            statementId,
+            whereStartLine
+          );
         }
         inCreateTable = false;
         inInsertValues = false;
@@ -1002,7 +1053,13 @@ export class ParserService {
 
       // Process SELECT list AS aliases
       if (inSelectList && lineText.toLowerCase().includes(" as ")) {
-        this.parseSqlSelectAs(lineText, lineNum, tokens, statementId, selectListStartLine);
+        this.parseSqlSelectAs(
+          lineText,
+          lineNum,
+          tokens,
+          statementId,
+          selectListStartLine
+        );
       }
     }
 
@@ -1020,12 +1077,17 @@ export class ParserService {
   private parseSqlCreateIndexGroup(
     indexLines: Array<{ lineNum: number; lineText: string }>,
     tokens: AlignmentToken[],
-    statementId: number,
+    statementId: number
   ): void {
     if (indexLines.length < 2) {
       // Single CREATE INDEX line - still emit tokens for potential future grouping
       if (indexLines.length === 1) {
-        this.parseSqlCreateIndex(indexLines[0].lineText, indexLines[0].lineNum, tokens, statementId);
+        this.parseSqlCreateIndex(
+          indexLines[0].lineText,
+          indexLines[0].lineNum,
+          tokens,
+          statementId
+        );
       }
       return;
     }
@@ -1045,11 +1107,15 @@ export class ParserService {
     startLine: number,
     endLine: number,
     tokens: AlignmentToken[],
-    statementId: number,
+    statementId: number
   ): void {
     // Columns are typically on lines between CREATE TABLE ( and );
     // Each column line: name TYPE [CONSTRAINTS]
-    const columnLines: Array<{ lineNum: number; parts: string[]; indent: number }> = [];
+    const columnLines: Array<{
+      lineNum: number;
+      parts: string[];
+      indent: number;
+    }> = [];
 
     for (let lineNum = startLine + 1; lineNum < endLine; lineNum++) {
       const lineText = lines[lineNum];
@@ -1057,12 +1123,15 @@ export class ParserService {
       const indent = getIndentLevel(lineText);
 
       // Skip empty lines, closing paren, constraints like PRIMARY KEY, etc.
-      if (trimmed === "" || trimmed.startsWith(")") ||
-          trimmed.toUpperCase().startsWith("PRIMARY KEY") ||
-          trimmed.toUpperCase().startsWith("FOREIGN KEY") ||
-          trimmed.toUpperCase().startsWith("UNIQUE") ||
-          trimmed.toUpperCase().startsWith("CHECK") ||
-          trimmed.toUpperCase().startsWith("CONSTRAINT")) {
+      if (
+        trimmed === "" ||
+        trimmed.startsWith(")") ||
+        trimmed.toUpperCase().startsWith("PRIMARY KEY") ||
+        trimmed.toUpperCase().startsWith("FOREIGN KEY") ||
+        trimmed.toUpperCase().startsWith("UNIQUE") ||
+        trimmed.toUpperCase().startsWith("CHECK") ||
+        trimmed.toUpperCase().startsWith("CONSTRAINT")
+      ) {
         continue;
       }
 
@@ -1091,7 +1160,7 @@ export class ParserService {
         line: col.lineNum,
         column: colNameStart,
         text: col.parts[0],
-        type: ":",  // Using : type for padAfter behavior
+        type: ":", // Using : type for padAfter behavior
         indent: col.indent,
         parentType: "sql_column_def",
         tokenIndex: 0,
@@ -1101,13 +1170,16 @@ export class ParserService {
 
       // Token for type (to pad after it so constraints align)
       if (col.parts.length >= 2) {
-        const typeStart = lineText.indexOf(col.parts[1], colNameStart + col.parts[0].length);
+        const typeStart = lineText.indexOf(
+          col.parts[1],
+          colNameStart + col.parts[0].length
+        );
         if (typeStart >= 0) {
           tokens.push({
             line: col.lineNum,
             column: typeStart,
             text: col.parts[1],
-            type: ":",  // Using : type for padAfter behavior
+            type: ":", // Using : type for padAfter behavior
             indent: col.indent,
             parentType: "sql_column_def",
             tokenIndex: 1,
@@ -1127,10 +1199,12 @@ export class ParserService {
     lineText: string,
     lineNum: number,
     tokens: AlignmentToken[],
-    statementId: number,
+    statementId: number
   ): void {
     const indent = getIndentLevel(lineText);
     const upper = lineText.toUpperCase();
+    // Use array_ prefix to enable cross-line alignment in Grouper
+    const scopeId = `array_sql_index_${statementId}`;
 
     // Find ON keyword position
     const onMatch = upper.match(/\bON\b/);
@@ -1139,27 +1213,37 @@ export class ParserService {
         line: lineNum,
         column: onMatch.index,
         text: "ON",
-        type: "=",  // Using = for padBefore
+        type: "=", // Using = for padBefore
         indent,
-        parentType: "sql_index_on",
+        parentType: "sql_index",
         tokenIndex: 0,
-        scopeId: `sql_index_${statementId}`,
+        scopeId,
         operatorCountOnLine: 2,
       });
     }
 
-    // Find USING keyword position
-    const usingMatch = upper.match(/\bUSING\b/);
-    if (usingMatch && usingMatch.index !== undefined) {
+    // Find USING METHOD pattern and emit token for the method name
+    // Expected: USING GIST (path) -> USING GIST  (path) to align with USING BTREE (path)
+    const usingMethodMatch = upper.match(/\bUSING\s+(\w+)/);
+    if (usingMethodMatch && usingMethodMatch.index !== undefined) {
+      const methodName = usingMethodMatch[1];
+      const methodStart =
+        usingMethodMatch.index + usingMethodMatch[0].indexOf(methodName);
+      // Get the actual case method name from original line
+      const actualMethod = lineText.substring(
+        methodStart,
+        methodStart + methodName.length
+      );
+
       tokens.push({
         line: lineNum,
-        column: usingMatch.index,
-        text: "USING",
-        type: ":",  // Using : for padAfter
+        column: methodStart,
+        text: actualMethod,
+        type: ":", // Using : for padAfter - pad after method name
         indent,
-        parentType: "sql_index_using",
+        parentType: "sql_index",
         tokenIndex: 1,
-        scopeId: `sql_index_${statementId}`,
+        scopeId,
         operatorCountOnLine: 2,
       });
     }
@@ -1168,74 +1252,44 @@ export class ParserService {
   /**
    * Parse INSERT VALUES tuple.
    * Aligns comma-separated values across tuples.
+   * Emits comma tokens - padding goes AFTER comma, BEFORE next value.
    */
   private parseSqlValuesTuple(
     lineText: string,
     lineNum: number,
     tokens: AlignmentToken[],
-    statementId: number,
+    statementId: number
   ): void {
     const indent = getIndentLevel(lineText);
 
     // Find all comma positions (structural, not inside strings)
     const commaPositions = this.findSqlCommas(lineText);
 
-    // Find the opening/closing parens
-    const openParen = lineText.indexOf("(");
-    const closeParen = lineText.lastIndexOf(")");
-    if (openParen < 0 || closeParen < 0) return;
-
-    // For VALUES alignment, we pad AFTER each value (except last) so next values align
-    // But we need the FIRST value to have padAfter so second values align,
-    // the SECOND value to have padAfter so third values align, etc.
-    let tokenIndex = 0;
-    const operatorCountOnLine = commaPositions.length + 1;
+    // Need at least one comma to align
+    if (commaPositions.length === 0) return;
 
     // Use array_ prefix for scopeId to enable cross-line alignment in Grouper
     const scopeId = `array_sql_values_${statementId}`;
+    const operatorCountOnLine = commaPositions.length;
 
-    // First value: between ( and first comma
-    const firstComma = commaPositions.length > 0 ? commaPositions[0] : closeParen;
-    if (firstComma > openParen) {
-      const firstValue = lineText.substring(openParen + 1, firstComma).trim();
-      const firstValueStart = lineText.indexOf(firstValue, openParen + 1);
+    // Emit tokens for each comma (except the last one before closing paren)
+    // Padding goes AFTER the comma to align the NEXT value
+    // Emit tokens for all commas (padding goes after each comma)
+    for (let i = 0; i < commaPositions.length; i++) {
+      const commaPos = commaPositions[i];
 
-      // Use ":" type for padAfter behavior - pad after this value
+      // Emit comma token - padding goes after comma
       tokens.push({
         line: lineNum,
-        column: firstValueStart,
-        text: firstValue,
-        type: ":",  // padAfter
+        column: commaPos,
+        text: ",",
+        type: ":", // padAfter - padding goes after comma
         indent,
-        parentType: "sql_values_item",
-        tokenIndex: tokenIndex++,
+        parentType: "sql_values_comma",
+        tokenIndex: i,
         scopeId,
         operatorCountOnLine,
       });
-    }
-
-    // Subsequent values: between commas (but NOT the last value - no padding needed before closing paren)
-    for (let i = 0; i < commaPositions.length - 1; i++) {
-      const commaPos = commaPositions[i];
-      const nextBoundary = commaPositions[i + 1];
-
-      if (nextBoundary > commaPos) {
-        const valueText = lineText.substring(commaPos + 1, nextBoundary).trim();
-        const valueStart = lineText.indexOf(valueText, commaPos + 1);
-
-        // Use ":" type for padAfter behavior - pad after this value
-        tokens.push({
-          line: lineNum,
-          column: valueStart,
-          text: valueText,
-          type: ":",  // padAfter
-          indent,
-          parentType: "sql_values_item",
-          tokenIndex: tokenIndex++,
-          scopeId,
-          operatorCountOnLine,
-        });
-      }
     }
   }
 
@@ -1248,7 +1302,7 @@ export class ParserService {
     lineNum: number,
     tokens: AlignmentToken[],
     statementId: number,
-    whereStartLine: number,
+    whereStartLine: number
   ): void {
     // Use normalized indent (0) so WHERE and AND lines group together
     // despite their different actual indentation
@@ -1264,7 +1318,7 @@ export class ParserService {
           line: lineNum,
           column: opIndex,
           text: op,
-          type: "=",  // Use = type for padBefore
+          type: "=", // Use = type for padBefore
           indent: normalizedIndent,
           parentType: "sql_where_op",
           tokenIndex: 0,
@@ -1285,7 +1339,7 @@ export class ParserService {
     lineNum: number,
     tokens: AlignmentToken[],
     statementId: number,
-    selectStartLine: number,
+    selectStartLine: number
   ): void {
     const indent = getIndentLevel(lineText);
 
@@ -1296,7 +1350,7 @@ export class ParserService {
         line: lineNum,
         column: asMatch.index,
         text: "as",
-        type: "=",  // Use = type for padBefore
+        type: "=", // Use = type for padBefore
         indent,
         parentType: "sql_select_as",
         tokenIndex: 0,
@@ -1372,18 +1426,39 @@ export class ParserService {
 
           // For single char operators, check they're not part of multi-char ops
           if (op.length === 1) {
-            if (op === "=" && (before === "<" || before === ">" || before === "!" || after === ">")) {
+            if (
+              op === "=" &&
+              (before === "<" ||
+                before === ">" ||
+                before === "!" ||
+                after === ">")
+            ) {
               continue;
             }
-            if (op === "<" && (after === "=" || after === ">" || after === "@")) {
+            if (
+              op === "<" &&
+              (after === "=" || after === ">" || after === "@")
+            ) {
               continue;
             }
-            // Skip > when part of ->, ->>, or >= 
-            if (op === ">" && (after === "=" || after === ">" || before === "<" || before === "-" || before === ">")) {
+            // Skip > when part of ->, ->>, or >=
+            if (
+              op === ">" &&
+              (after === "=" ||
+                after === ">" ||
+                before === "<" ||
+                before === "-" ||
+                before === ">")
+            ) {
               continue;
             }
             // Skip ~ when it's at the start of a word (might be PostgreSQL bitwise NOT)
-            if (op === "~" && (before !== " " && before !== "\t" && before !== "(")) {
+            if (
+              op === "~" &&
+              before !== " " &&
+              before !== "\t" &&
+              before !== "("
+            ) {
               continue;
             }
           }
@@ -1403,7 +1478,7 @@ export class ParserService {
   private async parseMarkdownCodeBlocks(
     document: vscode.TextDocument,
     startLine: number,
-    endLine: number,
+    endLine: number
   ): Promise<AlignmentToken[]> {
     const text = document.getText();
     const lines = text.split("\n");
@@ -1489,7 +1564,7 @@ export class ParserService {
         block.content,
         block.lang,
         block.startLine,
-        blockScopeId,
+        blockScopeId
       );
 
       tokens.push(...blockTokens);
@@ -1506,7 +1581,7 @@ export class ParserService {
     content: string,
     lang: string,
     lineOffset: number,
-    blockScopeId: string,
+    blockScopeId: string
   ): Promise<AlignmentToken[]> {
     const tokens: AlignmentToken[] = [];
 
@@ -1825,7 +1900,7 @@ export class ParserService {
    * Returns array of {startCol, text} for each argument.
    */
   private extractFunctionArguments(
-    argsText: string,
+    argsText: string
   ): Array<{ startCol: number; text: string }> {
     const args: Array<{ startCol: number; text: string }> = [];
     let inString = false;
@@ -1959,7 +2034,7 @@ export class ParserService {
    */
   private findInlineObjectCommas(
     lineText: string,
-    colons: { column: number }[],
+    colons: { column: number }[]
   ): number[] {
     const commaPositions: number[] = [];
 
@@ -1975,7 +2050,7 @@ export class ParserService {
       const commaCol = this.findCommaBetween(
         lineText,
         currentColonCol + 1,
-        nextColonCol,
+        nextColonCol
       );
       if (commaCol !== null) {
         commaPositions.push(commaCol);
@@ -1990,7 +2065,10 @@ export class ParserService {
    * Returns 0 if outside all braces, 1 if inside first brace, 2+ if nested.
    * Handles strings properly.
    */
-  private getBraceDepthAtColumn(lineText: string, targetColumn: number): number {
+  private getBraceDepthAtColumn(
+    lineText: string,
+    targetColumn: number
+  ): number {
     let depth = 0;
     let inString = false;
     let stringChar = "";
@@ -2045,7 +2123,7 @@ export class ParserService {
   private findClosingBraceAtDepth(
     lineText: string,
     colons: { column: number }[],
-    targetDepth: number,
+    targetDepth: number
   ): number | null {
     // Find the rightmost colon at this depth
     const rightmostColonCol = Math.max(...colons.map((c) => c.column));
@@ -2107,7 +2185,10 @@ export class ParserService {
     // Now find the last non-whitespace character before the }
     // We want to insert padding AFTER that character
     let lastNonWhitespace = closingBraceCol - 1;
-    while (lastNonWhitespace > rightmostColonCol && /\s/.test(lineText[lastNonWhitespace])) {
+    while (
+      lastNonWhitespace > rightmostColonCol &&
+      /\s/.test(lineText[lastNonWhitespace])
+    ) {
       lastNonWhitespace--;
     }
 
@@ -2121,7 +2202,7 @@ export class ParserService {
    */
   private findInlineObjectClosingBrace(
     lineText: string,
-    colons: { column: number }[],
+    colons: { column: number }[]
   ): number | null {
     return this.findClosingBraceAtDepth(lineText, colons, 1);
   }
@@ -2132,10 +2213,10 @@ export class ParserService {
    */
   private findNestedObjectBraces(
     lineText: string,
-    outerColons: { column: number }[],
+    outerColons: { column: number }[]
   ): Array<{ insertCol: number; depth: number }> {
     const results: Array<{ insertCol: number; depth: number }> = [];
-    
+
     // Scan the line for nested objects (depth 2+)
     let inString = false;
     let stringChar = "";
@@ -2143,10 +2224,10 @@ export class ParserService {
     let depth = 0;
     let nestedStart = -1; // Column where current nested object started
     let lastNonWhitespace = -1;
-    
+
     for (let i = 0; i < lineText.length; i++) {
       const char = lineText[i];
-      
+
       if (escaped) {
         escaped = false;
         if (depth >= 2 && !inString) {
@@ -2154,12 +2235,12 @@ export class ParserService {
         }
         continue;
       }
-      
+
       if (char === "\\" && inString) {
         escaped = true;
         continue;
       }
-      
+
       if ((char === '"' || char === "'" || char === "`") && !inString) {
         inString = true;
         stringChar = char;
@@ -2168,7 +2249,7 @@ export class ParserService {
         }
         continue;
       }
-      
+
       if (char === stringChar && inString) {
         inString = false;
         stringChar = "";
@@ -2177,14 +2258,14 @@ export class ParserService {
         }
         continue;
       }
-      
+
       if (inString) {
         if (depth >= 2) {
           lastNonWhitespace = i;
         }
         continue;
       }
-      
+
       if (char === "{") {
         depth++;
         if (depth === 2) {
@@ -2193,7 +2274,7 @@ export class ParserService {
         }
         continue;
       }
-      
+
       if (char === "}") {
         if (depth === 2 && nestedStart !== -1) {
           // Found the end of a nested object
@@ -2208,13 +2289,13 @@ export class ParserService {
         depth--;
         continue;
       }
-      
+
       // Track last non-whitespace inside nested objects
       if (depth >= 2 && !/\s/.test(char)) {
         lastNonWhitespace = i;
       }
     }
-    
+
     return results;
   }
 
@@ -2225,7 +2306,7 @@ export class ParserService {
   private findCommaBetween(
     line: string,
     startCol: number,
-    endCol: number,
+    endCol: number
   ): number | null {
     let inString = false;
     let stringChar = "";

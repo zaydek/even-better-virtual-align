@@ -198,15 +198,15 @@ You can enable or disable alignment for specific languages in your `settings.jso
 ```json
 {
   "evenBetterVirtualAlign.enabledLanguages": {
-    "typescript": true,
+    "typescript":      true,
     "typescriptreact": true,
-    "json": true,
-    "jsonc": true,
-    "yaml": true,
-    "python": true,
-    "css": true,
-    "scss": true,
-    "less": true
+    "json":            true,
+    "jsonc":           true,
+    "yaml":            true,
+    "python":          true,
+    "css":             true,
+    "scss":            true,
+    "less":            true
   }
 }
 ```
@@ -235,9 +235,3 @@ cursor --install-extension even-better-virtual-align-*.vsix
 ## Credits
 
 Inspired by [virtual-better-align](https://github.com/hborchardt/virtual-better-align), which is based on [better-align](https://github.com/chouzz/vscode-better-align). Rebuilt from scratch using **Tree-sitter** for reliable, AST-based parsing.
-
----
-
-<p align="center">
-  <strong>Clean diffs. Aligned code. Zero compromises.</strong>
-</p>

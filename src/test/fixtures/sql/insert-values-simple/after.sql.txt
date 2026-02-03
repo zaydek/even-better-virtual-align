@@ -1,6 +1,6 @@
 INSERT INTO wow_content (path, name, metadata) VALUES
-    ('classes'                   , 'Classes'   , '{}'),
-    ('classes.warrior'           , 'Warrior'   , '{"armor": "plate"}'),
-    ('classes.warrior.arms'      , 'Arms'      , '{"role": "dps"}'),
-    ('classes.warrior.fury'      , 'Fury'      , '{"role": "dps"}'),
+    ('classes',                    'Classes',    '{}'),
+    ('classes.warrior',            'Warrior',    '{"armor": "plate"}'),
+    ('classes.warrior.arms',       'Arms',       '{"role": "dps"}'),
+    ('classes.warrior.fury',       'Fury',       '{"role": "dps"}'),
     ('classes.warrior.protection', 'Protection', '{"role": "tank"}');

@@ -1,10 +1,10 @@
 INSERT INTO wow_content (path, name, metadata) VALUES
-    ('classes.warrior'           , 'Warrior'    , '{"armor": "plate", "roles": ["tank", "dps"]}'),
-    ('classes.warrior.arms'      , 'Arms'       , '{"role": "dps", "resource": "rage"}'),
-    ('classes.warrior.fury'      , 'Fury'       , '{"role": "dps", "resource": "rage", "dual_wield": true}'),
-    ('classes.warrior.protection', 'Protection' , '{"role": "tank", "resource": "rage"}'),
-    ('classes.druid'             , 'Druid'      , '{"armor": "leather", "roles": ["tank", "healer", "dps"]}'),
-    ('classes.druid.balance'     , 'Balance'    , '{"role": "dps", "resource": "astral_power"}'),
-    ('classes.druid.feral'       , 'Feral'      , '{"role": "dps", "resource": "energy", "form": "cat"}'),
-    ('classes.druid.guardian'    , 'Guardian'   , '{"role": "tank", "resource": "rage", "form": "bear"}'),
-    ('classes.druid.restoration' , 'Restoration', '{"role": "healer", "resource": "mana"}');
+    ('classes.warrior',            'Warrior',     '{"armor": "plate", "roles": ["tank", "dps"]}'),
+    ('classes.warrior.arms',       'Arms',        '{"role": "dps", "resource": "rage"}'),
+    ('classes.warrior.fury',       'Fury',        '{"role": "dps", "resource": "rage", "dual_wield": true}'),
+    ('classes.warrior.protection', 'Protection',  '{"role": "tank", "resource": "rage"}'),
+    ('classes.druid',              'Druid',       '{"armor": "leather", "roles": ["tank", "healer", "dps"]}'),
+    ('classes.druid.balance',      'Balance',     '{"role": "dps", "resource": "astral_power"}'),
+    ('classes.druid.feral',        'Feral',       '{"role": "dps", "resource": "energy", "form": "cat"}'),
+    ('classes.druid.guardian',     'Guardian',    '{"role": "tank", "resource": "rage", "form": "bear"}'),
+    ('classes.druid.restoration',  'Restoration', '{"role": "healer", "resource": "mana"}');
