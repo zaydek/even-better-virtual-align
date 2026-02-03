@@ -7,13 +7,12 @@
 - [x] INSERT VALUES tuple alignment (columns 1-2 padded)
 - [x] WHERE clause operator alignment (LHS padded so operators align)
 - [x] SELECT AS alias alignment
-- [x] CREATE TABLE column name alignment
+- [x] CREATE TABLE column name AND type alignment
 - [x] CREATE INDEX grouping (consecutive CREATE INDEX lines group together)
 
-## What's Not Yet Implemented
-- [ ] CREATE TABLE type alignment (types not padded to align constraints)
-- [ ] Operator width normalization (e.g., `=` → `=·` when `<@` present)
-- [ ] JSON-in-SQL alignment (parsing JSON inside string literals)
+## Deferred (per LLM Council recommendation)
+- [ ] Operator width normalization (e.g., `=` → `= ` when `<@` present) - "nice to have" polish
+- [ ] JSON-in-SQL alignment (parsing JSON inside string literals) - risky, opt-in later
 
 ## Fixtures
 - `src/test/fixtures/sql/create-table/` - Column names align

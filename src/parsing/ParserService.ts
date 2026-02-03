@@ -1078,26 +1078,28 @@ export class ParserService {
 
     if (columnLines.length < 2) return; // Need at least 2 lines to align
 
-    // Emit tokens for column name alignment (pad column names)
+    // Use array_ prefix for scopeId to enable cross-line alignment in Grouper
+    const scopeId = `array_sql_create_${statementId}`;
+
+    // Emit tokens for column name and type alignment
     for (const col of columnLines) {
       const lineText = lines[col.lineNum];
       const colNameStart = lineText.indexOf(col.parts[0]);
 
-      // Token for column name (to pad after it)
-      // column = START of name, text = name, so padding goes after name
+      // Token for column name (to pad after it so types align)
       tokens.push({
         line: col.lineNum,
         column: colNameStart,
         text: col.parts[0],
         type: ":",  // Using : type for padAfter behavior
         indent: col.indent,
-        parentType: "sql_column_name",
+        parentType: "sql_column_def",
         tokenIndex: 0,
-        scopeId: `sql_create_${statementId}`,
+        scopeId,
         operatorCountOnLine: 2,
       });
 
-      // Token for type (to pad after it for constraint alignment)
+      // Token for type (to pad after it so constraints align)
       if (col.parts.length >= 2) {
         const typeStart = lineText.indexOf(col.parts[1], colNameStart + col.parts[0].length);
         if (typeStart >= 0) {
@@ -1107,9 +1109,9 @@ export class ParserService {
             text: col.parts[1],
             type: ":",  // Using : type for padAfter behavior
             indent: col.indent,
-            parentType: "sql_column_type",
+            parentType: "sql_column_def",
             tokenIndex: 1,
-            scopeId: `sql_create_${statementId}`,
+            scopeId,
             operatorCountOnLine: 2,
           });
         }

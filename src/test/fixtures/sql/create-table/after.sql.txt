@@ -1,8 +1,8 @@
 CREATE TABLE wow_content (
     id       SERIAL PRIMARY KEY,
-    path     ltree NOT NULL,
-    name     TEXT NOT NULL,
-    metadata JSONB DEFAULT '{}'
+    path     ltree  NOT NULL,
+    name     TEXT   NOT NULL,
+    metadata JSONB  DEFAULT '{}'
 );
 
 CREATE INDEX idx_wow_path       ON wow_content USING GIST (path);
