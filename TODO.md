@@ -1,31 +1,38 @@
-# TODO: SQL/PostgreSQL Alignment Support
+# TODO
 
-## Status
+## Current: Test Architecture Refactor
 
-**IMPLEMENTED** - Basic SQL alignment working. All tests passing.
+See `PLAN.md` for full context and checklist.
 
-## What's Working
+**Goal**: Run unit tests without opening VS Code window.
 
-- [x] INSERT VALUES tuple alignment (columns 1-2 padded)
+## Deferred: SQL Enhancements (per LLM Council)
+
+These were explicitly recommended to defer:
+
+- [ ] **Operator width normalization** - Make single-char operators (e.g., `=`) pad to match multi-char operators (e.g., `<@`) in the same group. Currently handled manually in fixtures. "Nice to have" polish.
+
+- [ ] **JSON-in-SQL alignment** - Parse JSON inside SQL string literals and align internal keys/values. Risky due to nested quote handling. Recommend opt-in setting if implemented later.
+
+## Completed: SQL/PostgreSQL Alignment
+
+**Status**: Implemented and tested.
+
+- [x] INSERT VALUES tuple alignment (columns pad after commas)
 - [x] WHERE clause operator alignment (LHS padded so operators align)
 - [x] SELECT AS alias alignment
-- [x] CREATE TABLE column name AND type alignment
-- [x] CREATE INDEX grouping (consecutive CREATE INDEX lines group together)
+- [x] CREATE TABLE column name AND type alignment (Definition Grid)
+- [x] CREATE INDEX grouping (consecutive lines share scope)
 
-## Deferred (per LLM Council recommendation)
+### Fixtures
 
-- [ ] Operator width normalization (e.g., `=` → `= ` when `<@` present) - "nice to have" polish
-- [ ] JSON-in-SQL alignment (parsing JSON inside string literals) - risky, opt-in later
+- `src/test/fixtures/sql/create-table/` - Column names and types
+- `src/test/fixtures/sql/insert-values-simple/` - Tuple columns
+- `src/test/fixtures/sql/insert-values-json/` - Tuple columns (no JSON parsing)
+- `src/test/fixtures/sql/select-where/` - WHERE operators
+- `src/test/fixtures/sql/select-complex/` - SELECT AS and WHERE
 
-## Fixtures
+### Notes
 
-- `src/test/fixtures/sql/create-table/` - Column names align
-- `src/test/fixtures/sql/insert-values-simple/` - Tuple columns align
-- `src/test/fixtures/sql/insert-values-json/` - Tuple columns align (no JSON parsing)
-- `src/test/fixtures/sql/select-where/` - WHERE operators align
-- `src/test/fixtures/sql/select-complex/` - SELECT AS and WHERE align
-
-## Notes
-
-- Fixtures now use regular spaces instead of `·` for easier editing
-- Council files removed (merged into main after.sql.txt files)
+- Fixtures use regular spaces (not `·`) for easier editing
+- SQL uses regex-based parsing (no Tree-sitter grammar available)
