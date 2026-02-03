@@ -1,0 +1,10 @@
+SELECT name, path, metadata->>'resource' as resource
+FROM wow_content
+WHERE path············· ~   'classes.*.*'
+  AND metadata->>'role' =   'tank';
+
+SELECT name, path, nlevel(path) as depth
+FROM wow_content
+WHERE path·················· <@  'zones'
+  AND metadata->>'faction'  =   'horde'
+ORDER BY path;

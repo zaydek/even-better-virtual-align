@@ -1,0 +1,26 @@
+SELECT
+    name,
+    path,
+    subpath(path, 0, 2) as continent_path
+FROM wow_content
+WHERE path ~ 'zones.*.*.*'
+  AND (metadata->>'starting_zone')::boolean = true;
+
+SELECT
+    nlevel(path) as depth,
+    subpath(path, 0, 2) as category,
+    COUNT(*) as count
+FROM wow_content
+WHERE path <@ 'items'
+GROUP BY depth, subpath(path, 0, 2)
+ORDER BY category, depth;
+
+WITH target AS (
+    SELECT path, subpath(path, 0, -1) as parent
+    FROM wow_content
+    WHERE path = 'classes.druid.feral'
+)
+SELECT wc.name, wc.path, wc.metadata->>'role' as role
+FROM wow_content wc, target t
+WHERE wc.path ~ (t.parent::text || '.*{1}')::lquery
+  AND wc.path != t.path;
