@@ -1,0 +1,8 @@
+// Sample columns matching ontology types
+const SAMPLE_COLUMNS: Column[] = [
+  { id: "col-1", name: "Sample ID",       type: "text",         typeNameId: null,            width: 180 },
+  { id: "col-2", name: "Instrument",      type: "relationship", typeNameId: "Instrument",    width: 120 },
+  { id: "col-3", name: "Test #",          type: "number",       typeNameId: null,            width: 80  },
+  { id: "col-4", name: "Cartridge Lot",   type: "relationship", typeNameId: "Cartridge Lot", width: 130 },
+  { id: "col-5", name: "Target (cps/μL)", type: "number",       typeNameId: null,            width: 120 },
+];
