@@ -7,6 +7,7 @@ Run unit tests with plain Node.js/Mocha without opening VS Code Extension Develo
 ## Current Problem
 
 Tests require VS Code because:
+
 1. `ParserService.parse()` takes `vscode.TextDocument` as input
 2. Tests use `vscode.workspace.openTextDocument()` to create documents
 3. WASM path resolution uses `vscode.ExtensionContext`
@@ -62,22 +63,34 @@ await Parser.init({
 New file `src/adapters/VSCodeDocumentAdapter.ts`:
 
 ```typescript
-import * as vscode from 'vscode';
-import { ParseableDocument } from '../core/types';
+import * as vscode from "vscode";
+import { ParseableDocument } from "../core/types";
 
 export class VSCodeDocumentAdapter implements ParseableDocument {
   constructor(private readonly document: vscode.TextDocument) {}
 
-  get languageId() { return this.document.languageId; }
-  get lineCount() { return this.document.lineCount; }
-  getText() { return this.document.getText(); }
+  get languageId() {
+    return this.document.languageId;
+  }
+  get lineCount() {
+    return this.document.lineCount;
+  }
+  getText() {
+    return this.document.getText();
+  }
 }
 ```
 
 ### Step 4: Update extension.ts
 
 ```typescript
-const wasmDir = path.join(context.extensionPath, 'node_modules', '@vscode', 'tree-sitter-wasm', 'wasm');
+const wasmDir = path.join(
+  context.extensionPath,
+  "node_modules",
+  "@vscode",
+  "tree-sitter-wasm",
+  "wasm"
+);
 const parserService = new ParserService({ wasmDir });
 
 // Usage
@@ -89,8 +102,11 @@ parserService.parse(docAdapter, 0, docAdapter.lineCount);
 
 ```typescript
 // src/test/mocks/MockDocument.ts
-export function createMockDocument(content: string, languageId: string): ParseableDocument {
-  const lines = content.split('\n');
+export function createMockDocument(
+  content: string,
+  languageId: string
+): ParseableDocument {
+  const lines = content.split("\n");
   return {
     languageId,
     lineCount: lines.length,

@@ -13,7 +13,14 @@ import { ParserService } from "../parsing/ParserService";
 import { createMockDocument } from "./mocks/MockDocument";
 
 // Path to fixtures
-const FIXTURES_DIR = path.join(__dirname, "..", "..", "src", "test", "fixtures");
+const FIXTURES_DIR = path.join(
+  __dirname,
+  "..",
+  "..",
+  "src",
+  "test",
+  "fixtures"
+);
 
 // Enable snapshot updates via environment variable
 const UPDATE_SNAPSHOTS = process.env.UPDATE_SNAPSHOTS === "1";
@@ -103,7 +110,8 @@ function applyAlignment(
   });
 
   const lineShift = new Map<number, number>();
-  const paddingOps: Array<{ line: number; column: number; spaces: number }> = [];
+  const paddingOps: Array<{ line: number; column: number; spaces: number }> =
+    [];
 
   for (const group of sortedGroups) {
     let visualTargetColumn: number;
@@ -151,8 +159,15 @@ function applyAlignment(
       }
 
       if (spacesNeeded > 0) {
-        paddingOps.push({ line: token.line, column: insertColumn, spaces: spacesNeeded });
-        lineShift.set(token.line, (lineShift.get(token.line) ?? 0) + spacesNeeded);
+        paddingOps.push({
+          line: token.line,
+          column: insertColumn,
+          spaces: spacesNeeded,
+        });
+        lineShift.set(
+          token.line,
+          (lineShift.get(token.line) ?? 0) + spacesNeeded
+        );
       }
     }
   }
@@ -184,7 +199,15 @@ async function runTests(): Promise<void> {
     const treeSitterPath = require.resolve("@vscode/tree-sitter-wasm");
     wasmDir = path.dirname(treeSitterPath);
   } catch {
-    wasmDir = path.join(__dirname, "..", "..", "node_modules", "@vscode", "tree-sitter-wasm", "wasm");
+    wasmDir = path.join(
+      __dirname,
+      "..",
+      "..",
+      "node_modules",
+      "@vscode",
+      "tree-sitter-wasm",
+      "wasm"
+    );
   }
 
   // Initialize parser
@@ -203,7 +226,9 @@ async function runTests(): Promise<void> {
     const fixtureName = path.relative(FIXTURES_DIR, fixture.dir);
 
     try {
-      const beforeContent = fs.readFileSync(fixture.beforePath, "utf-8").replace(/\r\n/g, "\n");
+      const beforeContent = fs
+        .readFileSync(fixture.beforePath, "utf-8")
+        .replace(/\r\n/g, "\n");
       const doc = createMockDocument(beforeContent, fixture.languageId);
       const tokens = await parserService.parse(doc, 0, doc.lineCount - 1);
       const groups = groupTokens(tokens);
@@ -225,14 +250,20 @@ async function runTests(): Promise<void> {
         continue;
       }
 
-      const afterContent = fs.readFileSync(fixture.afterPath, "utf-8").replace(/\r\n/g, "\n");
+      const afterContent = fs
+        .readFileSync(fixture.afterPath, "utf-8")
+        .replace(/\r\n/g, "\n");
       assert.strictEqual(actual, afterContent);
       console.log(`  ✓ ${fixtureName}`);
       passed++;
     } catch (error) {
       console.log(`  ✗ ${fixtureName}`);
       failed++;
-      failures.push(`${fixtureName}: ${error instanceof Error ? error.message : String(error)}`);
+      failures.push(
+        `${fixtureName}: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
     }
   }
 
