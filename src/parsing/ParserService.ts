@@ -848,15 +848,12 @@ export class ParserService {
     const lines = text.split("\n");
 
     // Parse statement by statement
+    // Only handles "tabular" patterns: CREATE TABLE, INSERT VALUES, CREATE INDEX
     let statementId = 0;
     let inCreateTable = false;
     let inInsertValues = false;
-    let inWhere = false;
-    let inSelectList = false;
     let inCreateIndex = false;
     let createTableStartLine = -1;
-    let whereStartLine = -1;
-    let selectListStartLine = -1;
     let createIndexStartLine = -1;
     let createIndexLines: Array<{ lineNum: number; lineText: string }> = [];
 
@@ -890,8 +887,6 @@ export class ParserService {
         statementId++;
         inCreateTable = true;
         inInsertValues = false;
-        inWhere = false;
-        inSelectList = false;
         inCreateIndex = false;
         createTableStartLine = lineNum;
         continue;
@@ -904,8 +899,6 @@ export class ParserService {
           statementId++;
           inCreateTable = false;
           inInsertValues = false;
-          inWhere = false;
-          inSelectList = false;
           inCreateIndex = true;
           createIndexStartLine = lineNum;
           createIndexLines = [];
@@ -927,8 +920,6 @@ export class ParserService {
         statementId++;
         inCreateTable = false;
         inInsertValues = upperTrimmed.includes("VALUES");
-        inWhere = false;
-        inSelectList = false;
         continue;
       }
 
@@ -941,73 +932,9 @@ export class ParserService {
         continue;
       }
 
-      // Detect SELECT
-      if (upperTrimmed.startsWith("SELECT")) {
-        statementId++;
-        inCreateTable = false;
-        inInsertValues = false;
-        inWhere = false;
-        inSelectList = true;
-        selectListStartLine = lineNum;
-        continue;
-      }
-
-      // Detect FROM (ends SELECT list)
-      if (upperTrimmed.startsWith("FROM")) {
-        inSelectList = false;
-      }
-
-      // Detect WHERE
-      if (
-        upperTrimmed.startsWith("WHERE") ||
-        upperTrimmed.startsWith("AND ") ||
-        upperTrimmed.startsWith("OR ")
-      ) {
-        if (upperTrimmed.startsWith("WHERE")) {
-          whereStartLine = lineNum;
-        }
-        inWhere = true;
-        inSelectList = false;
-        // Process this line for WHERE operators
-        this.parseSqlWhereOperators(
-          lineText,
-          lineNum,
-          tokens,
-          statementId,
-          whereStartLine
-        );
-        continue;
-      }
-
-      // Detect end of WHERE clause
-      if (
-        upperTrimmed.startsWith("ORDER BY") ||
-        upperTrimmed.startsWith("GROUP BY") ||
-        upperTrimmed.startsWith("HAVING") ||
-        upperTrimmed.startsWith("LIMIT")
-      ) {
-        inWhere = false;
-      }
-
       // Process INSERT VALUES tuples (before checking for ;)
       if (inInsertValues && trimmed.startsWith("(")) {
         this.parseSqlValuesTuple(lineText, lineNum, tokens, statementId);
-      }
-
-      // Process WHERE clause operators
-      if (
-        inWhere &&
-        !upperTrimmed.startsWith("WHERE") &&
-        !upperTrimmed.startsWith("AND ") &&
-        !upperTrimmed.startsWith("OR ")
-      ) {
-        this.parseSqlWhereOperators(
-          lineText,
-          lineNum,
-          tokens,
-          statementId,
-          whereStartLine
-        );
       }
 
       // End of statement
@@ -1021,32 +948,9 @@ export class ParserService {
             statementId
           );
         }
-        // Also check for WHERE on this line (e.g., "WHERE x = 1;")
-        if (inWhere) {
-          this.parseSqlWhereOperators(
-            lineText,
-            lineNum,
-            tokens,
-            statementId,
-            whereStartLine
-          );
-        }
         inCreateTable = false;
         inInsertValues = false;
-        inWhere = false;
-        inSelectList = false;
         continue;
-      }
-
-      // Process SELECT list AS aliases
-      if (inSelectList && lineText.toLowerCase().includes(" as ")) {
-        this.parseSqlSelectAs(
-          lineText,
-          lineNum,
-          tokens,
-          statementId,
-          selectListStartLine
-        );
       }
     }
 
@@ -1281,73 +1185,6 @@ export class ParserService {
   }
 
   /**
-   * Parse WHERE clause operators.
-   * Aligns: =, <>, !=, <, >, <=, >=, <@, ~, LIKE, etc.
-   */
-  private parseSqlWhereOperators(
-    lineText: string,
-    lineNum: number,
-    tokens: AlignmentToken[],
-    statementId: number,
-    whereStartLine: number
-  ): void {
-    // Use normalized indent (0) so WHERE and AND lines group together
-    // despite their different actual indentation
-    const normalizedIndent = 0;
-
-    // SQL comparison operators (order matters - longer first)
-    const operators = ["<@", "<>", "!=", "<=", ">=", "~", "<", ">", "="];
-
-    for (const op of operators) {
-      const opIndex = this.findSqlOperator(lineText, op);
-      if (opIndex >= 0) {
-        tokens.push({
-          line: lineNum,
-          column: opIndex,
-          text: op,
-          type: "=", // Use = type for padBefore
-          indent: normalizedIndent,
-          parentType: "sql_where_op",
-          tokenIndex: 0,
-          scopeId: `sql_where_${statementId}_${whereStartLine}`,
-          operatorCountOnLine: 1,
-        });
-        break; // Only take the first operator per line
-      }
-    }
-  }
-
-  /**
-   * Parse SELECT AS aliases.
-   * Aligns the AS keyword across SELECT list items.
-   */
-  private parseSqlSelectAs(
-    lineText: string,
-    lineNum: number,
-    tokens: AlignmentToken[],
-    statementId: number,
-    selectStartLine: number
-  ): void {
-    const indent = getIndentLevel(lineText);
-
-    // Find AS keyword (case-insensitive, word boundary)
-    const asMatch = lineText.match(/\bas\b/i);
-    if (asMatch && asMatch.index !== undefined) {
-      tokens.push({
-        line: lineNum,
-        column: asMatch.index,
-        text: "as",
-        type: "=", // Use = type for padBefore
-        indent,
-        parentType: "sql_select_as",
-        tokenIndex: 0,
-        scopeId: `sql_select_${statementId}_${selectStartLine}`,
-        operatorCountOnLine: 1,
-      });
-    }
-  }
-
-  /**
    * Find structural commas in SQL (not inside strings).
    */
   private findSqlCommas(line: string): number[] {
@@ -1382,80 +1219,6 @@ export class ParserService {
     }
 
     return positions;
-  }
-
-  /**
-   * Find SQL operator position (not inside strings).
-   */
-  private findSqlOperator(line: string, op: string): number {
-    let inSingleQuote = false;
-    let inDoubleQuote = false;
-
-    for (let i = 0; i <= line.length - op.length; i++) {
-      const char = line[i];
-      const prevChar = i > 0 ? line[i - 1] : "";
-
-      // Handle quotes
-      if (char === "'" && prevChar !== "\\" && !inDoubleQuote) {
-        inSingleQuote = !inSingleQuote;
-        continue;
-      }
-      if (char === '"' && prevChar !== "\\" && !inSingleQuote) {
-        inDoubleQuote = !inDoubleQuote;
-        continue;
-      }
-
-      if (!inSingleQuote && !inDoubleQuote) {
-        if (line.substring(i, i + op.length) === op) {
-          // Make sure it's not part of a larger operator
-          const before = i > 0 ? line[i - 1] : " ";
-          const after = i + op.length < line.length ? line[i + op.length] : " ";
-
-          // For single char operators, check they're not part of multi-char ops
-          if (op.length === 1) {
-            if (
-              op === "=" &&
-              (before === "<" ||
-                before === ">" ||
-                before === "!" ||
-                after === ">")
-            ) {
-              continue;
-            }
-            if (
-              op === "<" &&
-              (after === "=" || after === ">" || after === "@")
-            ) {
-              continue;
-            }
-            // Skip > when part of ->, ->>, or >=
-            if (
-              op === ">" &&
-              (after === "=" ||
-                after === ">" ||
-                before === "<" ||
-                before === "-" ||
-                before === ">")
-            ) {
-              continue;
-            }
-            // Skip ~ when it's at the start of a word (might be PostgreSQL bitwise NOT)
-            if (
-              op === "~" &&
-              before !== " " &&
-              before !== "\t" &&
-              before !== "("
-            ) {
-              continue;
-            }
-          }
-
-          return i;
-        }
-      }
-    }
-
-    return -1;
   }
 
   /**
