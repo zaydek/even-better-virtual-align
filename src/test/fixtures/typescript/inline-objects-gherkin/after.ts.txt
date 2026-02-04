@@ -1,0 +1,7 @@
+await story.setup(page, "Login", "Successful login with valid credentials", [
+  { keyword: "Given", text: "I am on the login page"             },
+  { keyword: "When",  text: "I enter my email address"           },
+  { keyword: "And",   text: "I enter my password"                },
+  { keyword: "And",   text: "I click the login button"           },
+  { keyword: "Then",  text: "I should be logged in successfully" },
+]);
