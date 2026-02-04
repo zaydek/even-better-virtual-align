@@ -6,5 +6,5 @@ WHERE path              ~ 'classes.*.*'
 SELECT name, path, nlevel(path) as depth
 FROM wow_content
 WHERE path                 <@ 'zones'
-  AND metadata->>'faction' =  'horde'
+  AND metadata->>'faction' = 'horde'
 ORDER BY path;

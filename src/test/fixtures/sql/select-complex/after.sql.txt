@@ -22,5 +22,5 @@ WITH target AS (
 )
 SELECT wc.name, wc.path, wc.metadata->>'role' as role
 FROM wow_content wc, target t
-WHERE wc.path ~  (t.parent::text || '.*{1}')::lquery
+WHERE wc.path ~ (t.parent::text || '.*{1}')::lquery
   AND wc.path != t.path;

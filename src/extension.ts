@@ -5,7 +5,9 @@
  * visual alignment without modifying files.
  */
 
+import * as path from "path";
 import * as vscode from "vscode";
+import { VSCodeDocumentAdapter } from "./adapters/VSCodeDocumentAdapter";
 import { isSupportedLanguage } from "./core/types";
 import { groupTokens } from "./logic/Grouper";
 import { ParserService } from "./parsing/ParserService";
@@ -65,7 +67,22 @@ export async function activate(
   log("Activating...");
 
   // Initialize services
-  parserService = new ParserService(context);
+  // Find wasmDir using require.resolve, with fallback to extension path
+  let wasmDir: string;
+  try {
+    const treeSitterPath = require.resolve("@vscode/tree-sitter-wasm");
+    wasmDir = path.dirname(treeSitterPath);
+  } catch {
+    wasmDir = path.join(
+      context.extensionPath,
+      "node_modules",
+      "@vscode",
+      "tree-sitter-wasm",
+      "wasm"
+    );
+  }
+
+  parserService = new ParserService({ wasmDir });
   decorationManager = new DecorationManager();
 
   try {
@@ -194,8 +211,11 @@ async function updateEditor(editor: vscode.TextEditor): Promise<void> {
   const endLine = document.lineCount - 1;
 
   try {
+    // Wrap VS Code document with adapter for ParserService
+    const docAdapter = new VSCodeDocumentAdapter(document);
+
     // Parse document to extract tokens
-    const tokens = await parserService.parse(document, startLine, endLine);
+    const tokens = await parserService.parse(docAdapter, startLine, endLine);
 
     // Group tokens into alignment groups
     const groups = groupTokens(tokens);

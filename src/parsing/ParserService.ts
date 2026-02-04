@@ -6,11 +6,12 @@
  */
 
 import * as path from "path";
-import * as vscode from "vscode";
 import {
   AlignmentToken,
   getParserLanguage,
   OperatorType,
+  ParseableDocument,
+  ParserConfig,
   SupportedLanguage,
 } from "../core/types";
 
@@ -41,22 +42,8 @@ export class ParserService {
   private queries: Map<string, Query> = new Map();
   private wasmDir: string;
 
-  constructor(_context: vscode.ExtensionContext) {
-    // Find the wasm directory using require.resolve
-    // This works regardless of where the extension is installed
-    try {
-      const treeSitterPath = require.resolve("@vscode/tree-sitter-wasm");
-      this.wasmDir = path.dirname(treeSitterPath);
-    } catch {
-      // Fallback to extension path
-      this.wasmDir = path.join(
-        _context.extensionPath,
-        "node_modules",
-        "@vscode",
-        "tree-sitter-wasm",
-        "wasm"
-      );
-    }
+  constructor(config: ParserConfig) {
+    this.wasmDir = config.wasmDir;
     console.log("Even Better Virtual Align: WASM directory:", this.wasmDir);
   }
 
@@ -146,7 +133,7 @@ export class ParserService {
    * Parses a document and extracts alignable tokens.
    */
   async parse(
-    document: vscode.TextDocument,
+    document: ParseableDocument,
     startLine: number,
     endLine: number
   ): Promise<AlignmentToken[]> {
@@ -648,7 +635,7 @@ export class ParserService {
    * This handles escaped quotes and other edge cases that regex fails on.
    */
   private parseJsonWithRegex(
-    document: vscode.TextDocument,
+    document: ParseableDocument,
     startLine: number,
     endLine: number
   ): AlignmentToken[] {
@@ -746,7 +733,7 @@ export class ParserService {
    * YAML has unquoted keys followed by colons.
    */
   private parseYamlWithRegex(
-    document: vscode.TextDocument,
+    document: ParseableDocument,
     startLine: number,
     endLine: number
   ): AlignmentToken[] {
@@ -852,7 +839,7 @@ export class ParserService {
    * SQL alignment is statement-scoped: each statement resets alignment context.
    */
   private parseSqlWithRegex(
-    document: vscode.TextDocument,
+    document: ParseableDocument,
     startLine: number,
     endLine: number
   ): AlignmentToken[] {
@@ -1476,7 +1463,7 @@ export class ParserService {
    * with supported language identifiers.
    */
   private async parseMarkdownCodeBlocks(
-    document: vscode.TextDocument,
+    document: ParseableDocument,
     startLine: number,
     endLine: number
   ): Promise<AlignmentToken[]> {

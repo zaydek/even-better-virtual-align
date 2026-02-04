@@ -3,6 +3,30 @@
  * These interfaces decouple parsing from rendering.
  */
 
+/**
+ * Abstract document interface for parsing.
+ * Allows ParserService to work with VS Code documents or plain strings.
+ */
+export interface ParseableDocument {
+  /** Language identifier (e.g., "typescript", "json") */
+  readonly languageId: string;
+  /** Get the full text content */
+  getText(): string;
+  /** Number of lines in the document */
+  readonly lineCount: number;
+  /** Get text for a specific line */
+  lineAt(line: number): { text: string };
+}
+
+/**
+ * Configuration for ParserService.
+ * Decouples from VS Code ExtensionContext.
+ */
+export interface ParserConfig {
+  /** Absolute path to directory containing WASM files */
+  wasmDir: string;
+}
+
 /** Supported operator types across all languages */
 export type OperatorType =
   | "="

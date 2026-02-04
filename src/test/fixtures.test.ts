@@ -15,9 +15,9 @@
 import * as assert from "assert";
 import * as fs from "fs";
 import * as path from "path";
-import * as vscode from "vscode";
 import { groupTokens } from "../logic/Grouper";
 import { ParserService } from "../parsing/ParserService";
+import { createMockDocument } from "./mocks/MockDocument";
 
 // Path to fixtures (src/test/fixtures from project root)
 const FIXTURES_DIR = path.join(
@@ -255,41 +255,25 @@ function collectFixtures(): Array<{
 suite("Fixture Tests", () => {
   // Initialize parser before all tests
   suiteSetup(async () => {
-    // Create a mock extension context
-    const mockContext = {
-      extensionPath: path.join(__dirname, "..", ".."),
-      subscriptions: [],
-      workspaceState: {
-        get: () => undefined,
-        update: () => Promise.resolve(),
-      },
-      globalState: {
-        get: () => undefined,
-        update: () => Promise.resolve(),
-        setKeysForSync: () => {},
-      },
-      extensionUri: vscode.Uri.file(path.join(__dirname, "..", "..")),
-      storageUri: undefined,
-      globalStorageUri: vscode.Uri.file("/tmp"),
-      logUri: vscode.Uri.file("/tmp"),
-      extensionMode: vscode.ExtensionMode.Test,
-      storagePath: undefined,
-      globalStoragePath: "/tmp",
-      logPath: "/tmp",
-      asAbsolutePath: (p: string) => path.join(__dirname, "..", "..", p),
-      environmentVariableCollection:
-        {} as vscode.GlobalEnvironmentVariableCollection,
-      secrets: {
-        get: () => Promise.resolve(undefined),
-        store: () => Promise.resolve(),
-        delete: () => Promise.resolve(),
-        onDidChange: new vscode.EventEmitter<vscode.SecretStorageChangeEvent>()
-          .event,
-      },
-      extension: {} as vscode.Extension<unknown>,
-    } as unknown as vscode.ExtensionContext;
+    // Find wasmDir - resolve from node_modules
+    let wasmDir: string;
+    try {
+      const treeSitterPath = require.resolve("@vscode/tree-sitter-wasm");
+      wasmDir = path.dirname(treeSitterPath);
+    } catch {
+      // Fallback to project root
+      wasmDir = path.join(
+        __dirname,
+        "..",
+        "..",
+        "node_modules",
+        "@vscode",
+        "tree-sitter-wasm",
+        "wasm"
+      );
+    }
 
-    parserService = new ParserService(mockContext);
+    parserService = new ParserService({ wasmDir });
     await parserService.initialize();
   });
 
@@ -312,11 +296,8 @@ suite("Fixture Tests", () => {
         .readFileSync(fixture.beforePath, "utf-8")
         .replace(/\r\n/g, "\n");
 
-      // Create a virtual document
-      const doc = await vscode.workspace.openTextDocument({
-        content: beforeContent,
-        language: fixture.languageId,
-      });
+      // Create a mock document (no VS Code dependency)
+      const doc = createMockDocument(beforeContent, fixture.languageId);
 
       // Parse document
       const tokens = await parserService!.parse(doc, 0, doc.lineCount - 1);
