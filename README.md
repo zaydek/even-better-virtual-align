@@ -181,6 +181,10 @@ $spacing-unit:  0.25rem;
 
 ## Usage
 
+### Virtual Alignment (Default)
+
+Virtual alignment renders code as aligned **without modifying files**. Your code looks perfectly aligned in the editor, but the file on disk stays untouched.
+
 | Action      | Command / Shortcut                               |
 | :---------- | :----------------------------------------------- |
 | **Toggle**  | `Cmd+Shift+A` (Mac) / `Ctrl+Shift+A` (Win/Linux) |
@@ -188,6 +192,18 @@ $spacing-unit:  0.25rem;
 | **Disable** | Command Palette → `Even Better Virtual Align: Disable`    |
 
 **Status Bar:** Look for the "✓ Align" / "✗ Align" indicator in the bottom right.
+
+### Apply Formatting (Permanent)
+
+If you want to write the alignment to the file permanently (e.g., for sharing, code reviews, or Markdown tables), use the format command:
+
+| Action             | Command                                                    |
+| :----------------- | :--------------------------------------------------------- |
+| **Apply Formatting** | Command Palette → `Even Better Virtual Align: Apply Formatting` |
+
+This inserts actual space characters to align your code. The changes are reversible with undo (`Cmd+Z` / `Ctrl+Z`).
+
+> **Note:** If you use Prettier or another formatter with "Format on Save," it may collapse the alignment spaces. Consider using `// prettier-ignore` comments to protect aligned blocks.
 
 ---
 
