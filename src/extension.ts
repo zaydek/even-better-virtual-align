@@ -29,10 +29,12 @@ let enabled = true;
 function updateStatusBar(): void {
   if (enabled) {
     statusBarItem.text = "$(check) Align";
-    statusBarItem.tooltip = "Even Better Virtual Align: Enabled (click to disable)";
+    statusBarItem.tooltip =
+      "Even Better Virtual Align: Enabled (click to disable)";
   } else {
     statusBarItem.text = "$(x) Align";
-    statusBarItem.tooltip = "Even Better Virtual Align: Disabled (click to enable)";
+    statusBarItem.tooltip =
+      "Even Better Virtual Align: Disabled (click to enable)";
   }
 }
 
@@ -48,16 +50,18 @@ function log(message: string): void {
  * Activates the extension.
  */
 export async function activate(
-  context: vscode.ExtensionContext,
+  context: vscode.ExtensionContext
 ): Promise<void> {
   // Create output channel for logging
-  outputChannel = vscode.window.createOutputChannel("Even Better Virtual Align");
+  outputChannel = vscode.window.createOutputChannel(
+    "Even Better Virtual Align"
+  );
   context.subscriptions.push(outputChannel);
 
   // Create status bar item
   statusBarItem = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Right,
-    100,
+    100
   );
   statusBarItem.command = "even-better-virtual-align.toggle";
   updateStatusBar();
@@ -92,7 +96,7 @@ export async function activate(
     const errorMsg = error instanceof Error ? error.message : String(error);
     log(`Failed to initialize parser: ${errorMsg}`);
     vscode.window.showErrorMessage(
-      `Even Better Virtual Align: Failed to initialize. Error: ${errorMsg}`,
+      `Even Better Virtual Align: Failed to initialize. Error: ${errorMsg}`
     );
     return;
   }
@@ -108,15 +112,19 @@ export async function activate(
       updateStatusBar();
       log(`Toggled: ${enabled ? "enabled" : "disabled"}`);
       if (enabled) {
-        vscode.window.showInformationMessage("Even Better Virtual Align: Enabled");
+        vscode.window.showInformationMessage(
+          "Even Better Virtual Align: Enabled"
+        );
         if (vscode.window.activeTextEditor) {
           debouncedUpdate(vscode.window.activeTextEditor);
         }
       } else {
-        vscode.window.showInformationMessage("Even Better Virtual Align: Disabled");
+        vscode.window.showInformationMessage(
+          "Even Better Virtual Align: Disabled"
+        );
         decorationManager.clearAll();
       }
-    },
+    }
   );
   context.subscriptions.push(toggleCommand);
 
@@ -128,12 +136,14 @@ export async function activate(
         enabled = true;
         updateStatusBar();
         log("Enabled");
-        vscode.window.showInformationMessage("Even Better Virtual Align: Enabled");
+        vscode.window.showInformationMessage(
+          "Even Better Virtual Align: Enabled"
+        );
         if (vscode.window.activeTextEditor) {
           debouncedUpdate(vscode.window.activeTextEditor);
         }
       }
-    },
+    }
   );
   context.subscriptions.push(enableCommand);
 
@@ -145,10 +155,12 @@ export async function activate(
         enabled = false;
         updateStatusBar();
         log("Disabled");
-        vscode.window.showInformationMessage("Even Better Virtual Align: Disabled");
+        vscode.window.showInformationMessage(
+          "Even Better Virtual Align: Disabled"
+        );
         decorationManager.clearAll();
       }
-    },
+    }
   );
   context.subscriptions.push(disableCommand);
 
@@ -175,7 +187,11 @@ export async function activate(
       try {
         // Parse document
         const docAdapter = new VSCodeDocumentAdapter(document);
-        const tokens = await parserService.parse(docAdapter, 0, document.lineCount - 1);
+        const tokens = await parserService.parse(
+          docAdapter,
+          0,
+          document.lineCount - 1
+        );
         const groups = groupTokens(tokens);
 
         if (groups.length === 0) {
@@ -218,7 +234,7 @@ export async function activate(
         log(`Format failed: ${errorMsg}`);
         vscode.window.showErrorMessage(`Format failed: ${errorMsg}`);
       }
-    },
+    }
   );
   context.subscriptions.push(formatCommand);
 
@@ -228,7 +244,7 @@ export async function activate(
       if (editor && enabled) {
         debouncedUpdate(editor);
       }
-    },
+    }
   );
   context.subscriptions.push(activeEditorDisposable);
 
@@ -239,7 +255,7 @@ export async function activate(
       if (editor && enabled && event.document === editor.document) {
         debouncedUpdate(editor);
       }
-    },
+    }
   );
   context.subscriptions.push(documentChangeDisposable);
 
@@ -261,8 +277,19 @@ interface PaddingOp {
 }
 
 /**
+ * Counts the number of consecutive spaces starting at a given column in a line.
+ */
+function countExistingSpaces(lineText: string, column: number): number {
+  let count = 0;
+  for (let i = column; i < lineText.length && lineText[i] === " "; i++) {
+    count++;
+  }
+  return count;
+}
+
+/**
  * Calculates padding operations to apply alignment as actual text.
- * This is the same logic as the test runner's applyAlignment function.
+ * This version accounts for existing whitespace to make the operation idempotent.
  */
 function calculatePaddingOps(
   document: vscode.TextDocument,
@@ -275,6 +302,12 @@ function calculatePaddingOps(
     }
     return a.tokens[0].column - b.tokens[0].column;
   });
+
+  // Cache line texts
+  const lineTexts: string[] = [];
+  for (let i = 0; i < document.lineCount; i++) {
+    lineTexts.push(document.lineAt(i).text);
+  }
 
   const lineShift = new Map<number, number>();
   const paddingOps: PaddingOp[] = [];
@@ -325,15 +358,24 @@ function calculatePaddingOps(
       }
 
       if (spacesNeeded > 0) {
-        paddingOps.push({
-          line: token.line,
-          column: insertColumn,
-          spaces: spacesNeeded,
-        });
-        lineShift.set(
-          token.line,
-          (lineShift.get(token.line) ?? 0) + spacesNeeded
-        );
+        // Check for existing spaces at the insertion point
+        const lineText = lineTexts[token.line];
+        const existingSpaces = countExistingSpaces(lineText, insertColumn);
+
+        // Only skip if there's already MORE spaces than needed (already over-padded or correctly aligned)
+        // If existing <= spacesNeeded, we need to add the full amount since existing is likely just baseline spacing
+        if (existingSpaces <= spacesNeeded) {
+          paddingOps.push({
+            line: token.line,
+            column: insertColumn,
+            spaces: spacesNeeded,
+          });
+          lineShift.set(
+            token.line,
+            (lineShift.get(token.line) ?? 0) + spacesNeeded
+          );
+        }
+        // If existingSpaces > spacesNeeded, skip (already has sufficient padding)
       }
     }
   }
@@ -360,7 +402,10 @@ async function updateEditor(editor: vscode.TextEditor): Promise<void> {
 
   // Check if language is enabled in settings
   const config = vscode.workspace.getConfiguration("evenBetterVirtualAlign");
-  const enabledLanguages = config.get<Record<string, boolean>>("enabledLanguages", {});
+  const enabledLanguages = config.get<Record<string, boolean>>(
+    "enabledLanguages",
+    {}
+  );
   if (enabledLanguages[langId] === false) {
     decorationManager.clear(editor);
     return;
@@ -384,7 +429,7 @@ async function updateEditor(editor: vscode.TextEditor): Promise<void> {
     decorationManager.update(editor, groups);
   } catch (error) {
     log(
-      `Update failed: ${error instanceof Error ? error.message : String(error)}`,
+      `Update failed: ${error instanceof Error ? error.message : String(error)}`
     );
   }
 }

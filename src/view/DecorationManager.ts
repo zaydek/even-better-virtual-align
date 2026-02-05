@@ -36,7 +36,7 @@ export class DecorationManager {
     const commentGroups = groups.filter((g) => g.tokens[0]?.type === "//");
     const funcArgGroups = groups.filter((g) => g.tokens[0]?.type === "funcArg");
     const regularGroups = groups.filter(
-      (g) => g.tokens[0]?.type !== "//" && g.tokens[0]?.type !== "funcArg",
+      (g) => g.tokens[0]?.type !== "//" && g.tokens[0]?.type !== "funcArg"
     );
 
     // Track accumulated shift per line (from all padding)
@@ -59,7 +59,7 @@ export class DecorationManager {
     for (const scopeGroups of funcArgByScope.values()) {
       // Sort groups by tokenIndex (column order)
       scopeGroups.sort(
-        (a, b) => a.tokens[0].tokenIndex - b.tokens[0].tokenIndex,
+        (a, b) => a.tokens[0].tokenIndex - b.tokens[0].tokenIndex
       );
 
       // Track shift per line within this scope
@@ -115,10 +115,10 @@ export class DecorationManager {
     // --- PASS 2: Process regular operators ---
     // Separate function_arguments commas (need shift adjustment) from other operators
     const funcArgCommaGroups = regularGroups.filter(
-      (g) => g.tokens[0]?.parentType === "function_arguments",
+      (g) => g.tokens[0]?.parentType === "function_arguments"
     );
     const otherRegularGroups = regularGroups.filter(
-      (g) => g.tokens[0]?.parentType !== "function_arguments",
+      (g) => g.tokens[0]?.parentType !== "function_arguments"
     );
 
     // Process function_arguments commas with shift adjustment (like comments)
@@ -156,6 +156,26 @@ export class DecorationManager {
 
     // Process other regular operators normally
     for (const group of otherRegularGroups) {
+      // Recalculate target column using VISUAL positions (accounting for accumulated shifts)
+      let visualTargetColumn: number;
+      if (group.padAfter) {
+        // For padAfter groups, target is max visual end column
+        visualTargetColumn = Math.max(
+          ...group.tokens.map((t) => {
+            const shift = lineShift.get(t.line) ?? 0;
+            return t.column + t.text.length + shift;
+          })
+        );
+      } else {
+        // For padBefore groups, target is max visual start column
+        visualTargetColumn = Math.max(
+          ...group.tokens.map((t) => {
+            const shift = lineShift.get(t.line) ?? 0;
+            return t.column + shift;
+          })
+        );
+      }
+
       for (const token of group.tokens) {
         // Get current accumulated shift for this line (from previous passes/operators)
         const currentShift = lineShift.get(token.line) ?? 0;
@@ -167,16 +187,16 @@ export class DecorationManager {
           // For `:` - pad AFTER operator to align values
           // Visual end = document position + text length + accumulated shift
           const visualEnd = token.column + token.text.length + currentShift;
-          spacesNeeded = group.targetColumn - visualEnd;
+          spacesNeeded = visualTargetColumn - visualEnd;
           pos = new vscode.Position(
             token.line,
-            token.column + token.text.length,
+            token.column + token.text.length
           );
         } else {
-          // For `=`, `&&`, `||` - pad BEFORE operator to align operators
+          // For `=`, `&&`, `||`, `}` - pad BEFORE operator to align operators
           // Visual start = document position + accumulated shift
           const visualStart = token.column + currentShift;
-          spacesNeeded = group.targetColumn - visualStart;
+          spacesNeeded = visualTargetColumn - visualStart;
           pos = new vscode.Position(token.line, token.column);
         }
 
